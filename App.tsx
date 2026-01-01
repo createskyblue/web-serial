@@ -272,27 +272,10 @@ const App: React.FC = () => {
     let blob: Blob;
     let filename = `serial_log_${new Date().getTime()}`;
 
-    if (format === 'txt') {
-      const content = logs.map(l => {
-        const time = l.timestamp.toLocaleTimeString();
-        const prefix = l.type === 'rx' ? '[RX]' : l.type === 'tx' ? '[TX]' : '[SYS]';
-        return `${time} ${prefix} ${l.text}`;
-      }).join('\n');
-      blob = new Blob([content], { type: 'text/plain' });
-      filename += '.txt';
-    } else {
-      // BIN 模式：只合并 RX 数据
-      const rxData = logs.filter(l => l.type === 'rx').map(l => l.data);
-      const totalLength = rxData.reduce((acc, curr) => acc + curr.length, 0);
-      const merged = new Uint8Array(totalLength);
-      let offset = 0;
-      rxData.forEach(data => {
-        merged.set(data, offset);
-        offset += data.length;
-      });
-      blob = new Blob([merged], { type: 'application/octet-stream' });
-      filename += '.bin';
-    }
+    // 完全按照终端显示的内容导出，不添加时间戳
+    const content = logs.map(l => l.text).join('');
+    blob = new Blob([content], { type: 'text/plain' });
+    filename += format === 'txt' ? '.txt' : '.bin';
 
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -300,6 +283,36 @@ const App: React.FC = () => {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  // 一键复制功能
+  const copyLogs = () => {
+    if (logs.length === 0) return;
+    
+    // 完全按照终端显示的内容复制
+    const content = logs.map(l => l.text).join('');
+    
+    navigator.clipboard.writeText(content).then(() => {
+      console.log('日志已复制到剪贴板');
+    }).catch(err => {
+      console.error('复制失败:', err);
+      // 降级方案：使用传统的复制方法
+      const textArea = document.createElement('textarea');
+      textArea.value = content;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-999999px';
+      textArea.style.top = '-999999px';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        console.log('日志已复制到剪贴板（降级方案）');
+      } catch (err) {
+        console.error('复制失败（降级方案）:', err);
+      }
+      document.body.removeChild(textArea);
+    });
   };
 
   // 处理文件流发送
@@ -416,6 +429,15 @@ const App: React.FC = () => {
                 <i className="fas fa-file-code mr-1"></i> 导出 BIN
               </button>
             </div>
+            
+            {/* 一键复制按钮 */}
+            <button 
+              onClick={copyLogs}
+              disabled={logs.length === 0}
+              className="px-4 py-1.5 bg-blue-500 hover:bg-blue-600 text-white border border-blue-600 rounded-md text-xs transition-colors shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <i className="fas fa-copy mr-1"></i> 复制
+            </button>
             
             {/* 暂停按钮 */}
             <button 
