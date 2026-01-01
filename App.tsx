@@ -41,6 +41,7 @@ const App: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [isAutoLineBreak, setIsAutoLineBreak] = useState(false); 
   const [isAutoScroll, setIsAutoScroll] = useState(true); 
+  const [isPaused, setIsPaused] = useState(false); // 新增暂停状态
   const [config, setConfig] = useState<SerialConfig>({
     baudRate: 115200,
     dataBits: DataBits.Eight,
@@ -65,10 +66,16 @@ const App: React.FC = () => {
   const keepReadingRef = useRef(true);
   const terminalEndRef = useRef<HTMLDivElement>(null);
   const decoderRef = useRef(new TextDecoder("utf-8", { fatal: false }));
+  const isPausedRef = useRef(false); // 使用ref来跟踪暂停状态，确保在异步函数中能获取最新值
   
   // 用于统计每秒\n的计数器
   const newlineCountRef = useRef(0);
   const lastFrequencyUpdateRef = useRef(Date.now());
+
+  // 同步isPaused状态到ref
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+  }, [isPaused]);
 
   useEffect(() => {
     localStorage.setItem('quick_send_list', JSON.stringify(quickSendItems));
@@ -150,6 +157,7 @@ const App: React.FC = () => {
       setPort(null);
     }
     setIsConnected(false);
+    setIsPaused(false); // 断开连接时取消暂停
     addLog('info', new Uint8Array(), '串口已关闭');
   };
 
@@ -186,7 +194,8 @@ const App: React.FC = () => {
         while (true) {
           const { value, done } = await reader.read();
           if (done) break;
-          if (value) {
+          // 使用ref检查暂停状态，确保获取最新值
+          if (value && !isPausedRef.current) { 
             const textChunk = decoderRef.current.decode(value, { stream: true });
             addLog('rx', value, textChunk);
           }
@@ -201,6 +210,13 @@ const App: React.FC = () => {
 
   const sendData = async (input: string, mode: DisplayMode) => {
     if (!port || !port.writable) return;
+    
+    // 如果暂停状态，不允许发送数据
+    if (isPaused) {
+      addLog('error', new Uint8Array(), '发送失败: 串口已暂停');
+      return;
+    }
+    
     try {
       const data = mode === DisplayMode.Hex ? hexToUint8Array(input) : stringToUint8Array(input);
       const writer = port.writable.getWriter();
@@ -250,6 +266,13 @@ const App: React.FC = () => {
   // 处理文件流发送
   const handleFileSend = async (file: File, options: { mode: FileSendMode, throttleBytes: number, throttleMs: number, onProgress: (p: number) => void }) => {
     if (!port || !port.writable) return;
+    
+    // 如果暂停状态，不允许发送文件
+    if (isPaused) {
+      addLog('error', new Uint8Array(), '文件发送失败: 串口已暂停');
+      return;
+    }
+    
     const writer = port.writable.getWriter();
     const arrayBuffer = await file.arrayBuffer();
     const data = new Uint8Array(arrayBuffer);
@@ -260,6 +283,12 @@ const App: React.FC = () => {
       
       let sent = 0;
       while (sent < total) {
+        // 检查是否在发送过程中被暂停
+        if (isPaused) {
+          addLog('error', new Uint8Array(), '文件发送中断: 串口已暂停');
+          break;
+        }
+        
         const chunk = data.slice(sent, sent + options.throttleBytes);
         await writer.write(chunk);
         sent += chunk.length;
@@ -270,11 +299,27 @@ const App: React.FC = () => {
         }
       }
       
-      addLog('info', new Uint8Array(), `文件发送完毕`);
+      if (!isPaused) {
+        addLog('info', new Uint8Array(), `文件发送完毕`);
+      }
     } catch (err: any) {
       addLog('error', new Uint8Array(), `文件发送中断: ${err.message}`);
     } finally {
       writer.releaseLock();
+    }
+  };
+
+  // 切换暂停状态
+  const togglePause = () => {
+    if (!isConnected) return;
+    
+    const newPausedState = !isPaused;
+    setIsPaused(newPausedState);
+    
+    if (newPausedState) {
+      addLog('info', new Uint8Array(), '串口数据已暂停');
+    } else {
+      addLog('info', new Uint8Array(), '串口数据已恢复');
     }
   };
 
@@ -297,6 +342,11 @@ const App: React.FC = () => {
             <div className={`px-2 py-0.5 rounded text-[10px] font-bold ${isConnected ? 'bg-green-500 text-white' : 'bg-gray-400 text-white'}`}>
               {isConnected ? '已连接' : '未连接'}
             </div>
+            {isConnected && (
+              <div className={`px-2 py-0.5 rounded text-[10px] font-bold ${isPaused ? 'bg-orange-500 text-white' : 'bg-blue-500 text-white'}`}>
+                {isPaused ? '已暂停' : '运行中'}
+              </div>
+            )}
           </div>
           
           <div className="flex items-center space-x-3">
@@ -313,6 +363,20 @@ const App: React.FC = () => {
                 <i className="fas fa-file-code mr-1"></i> 导出 BIN
               </button>
             </div>
+            
+            {/* 暂停按钮 */}
+            <button 
+              onClick={togglePause}
+              disabled={!isConnected}
+              className={`px-4 py-1.5 border rounded-md text-xs transition-colors shadow-sm ${
+                isPaused 
+                  ? 'bg-orange-500 hover:bg-orange-600 text-white border-orange-600' 
+                  : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-300'
+              } disabled:opacity-30 disabled:cursor-not-allowed`}
+            >
+              <i className={`fas ${isPaused ? 'fa-play' : 'fa-pause'} mr-1`}></i>
+              {isPaused ? '恢复' : '暂停'}
+            </button>
             
             <button onClick={() => setLogs([])} className="px-4 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-md text-xs transition-colors shadow-sm">
               清屏
@@ -333,11 +397,11 @@ const App: React.FC = () => {
         </div>
 
         <footer className="bg-white border-t p-4 shadow-sm">
-          <Sender onSend={sendData} onFileSend={handleFileSend} isConnected={isConnected} />
+          <Sender onSend={sendData} onFileSend={handleFileSend} isConnected={isConnected && !isPaused} />
         </footer>
       </main>
 
-      <QuickSendList items={quickSendItems} onUpdate={setQuickSendItems} onSend={sendData} isConnected={isConnected} />
+      <QuickSendList items={quickSendItems} onUpdate={setQuickSendItems} onSend={sendData} isConnected={isConnected && !isPaused} />
     </div>
   );
 };
