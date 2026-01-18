@@ -37,7 +37,9 @@ const Terminal: React.FC<TerminalProps> = ({ logs, displayMode, isAutoLineBreak,
                 {log.type === 'rx' ? 'RX' : log.type === 'tx' ? 'TX' : 'SYS'}
               </span>
               <span className={`break-all leading-relaxed ${log.type === 'rx' ? 'text-slate-800' : log.type === 'tx' ? 'text-blue-600' : 'text-slate-400 italic'}`}>
-                {displayMode === DisplayMode.Hex && (log.type === 'rx' || log.type === 'tx') ? uint8ArrayToHex(log.data) : log.text}
+                {log.type === 'rx' ? (displayMode === DisplayMode.Hex ? uint8ArrayToHex(log.data) : log.text) : 
+                 log.type === 'tx' ? (displayMode === DisplayMode.Hex ? uint8ArrayToHex(log.data) + ' ' : log.text) : 
+                 log.text}
               </span>
             </div>
           ))
@@ -48,7 +50,7 @@ const Terminal: React.FC<TerminalProps> = ({ logs, displayMode, isAutoLineBreak,
                 key={log.id} 
                 className={`${log.type === 'rx' ? 'text-slate-800' : log.type === 'tx' ? 'text-blue-600' : 'text-amber-600 block my-2 text-xs border-l-2 border-amber-200 pl-2'}`}
               >
-                {log.type === 'tx' ? log.text : 
+                {log.type === 'tx' ? (displayMode === DisplayMode.Hex ? uint8ArrayToHex(log.data) + ' ' : log.text) : 
                  log.type === 'rx' ? (displayMode === DisplayMode.Hex ? uint8ArrayToHex(log.data) + ' ' : log.text) : 
                  `串口状态: ${log.text}`}
               </span>

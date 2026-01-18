@@ -11,19 +11,39 @@ interface SenderProps {
 }
 
 const Sender: React.FC<SenderProps> = ({ onSend, onFileSend, isConnected, isReconnecting = false }) => {
+  const [mode, setMode] = useState<DisplayMode>(DisplayMode.Text);
   const [input, setInput] = useState(() => {
     const saved = localStorage.getItem('serial-input');
-    return saved !== null ? saved : '';
+    if (saved !== null) {
+      try {
+        // 尝试将文本转换为Hex格式（如果需要的话）
+        // 这里默认保存的是文本格式，所以不需要额外转换
+        return saved;
+      } catch (error) {
+        return '';
+      }
+    }
+    return '';
   });
-  const [mode, setMode] = useState<DisplayMode>(DisplayMode.Text);
   const [isTimerEnabled, setIsTimerEnabled] = useState(false);
   const [timerInterval, setTimerInterval] = useState(1000);
   const [addNewline, setAddNewline] = useState(false);
 
-  // 持久化输入内容到 localStorage
+  // 持久化输入内容到 localStorage - 始终保存为文本格式
   useEffect(() => {
-    localStorage.setItem('serial-input', input);
-  }, [input]);
+    let contentToSave = input;
+    // 如果当前是Hex模式，先转换为文本再保存
+    if (mode === DisplayMode.Hex && input) {
+      try {
+        const data = hexToUint8Array(input);
+        contentToSave = uint8ArrayToString(data);
+      } catch (error) {
+        // 转换失败时保持原样
+        console.error('Hex转文本失败:', error);
+      }
+    }
+    localStorage.setItem('serial-input', contentToSave);
+  }, [input, mode]);
   
   // 文件发送相关
   const [fileSendMode, setFileSendMode] = useState<FileSendMode>(FileSendMode.Raw);

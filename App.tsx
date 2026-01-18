@@ -367,11 +367,13 @@ const App: React.FC = () => {
     }
 
     const data = mode === DisplayMode.Hex ? hexToUint8Array(input) : stringToUint8Array(input);
+    // 将数据解码为文本，确保log.text始终是文本格式
+    const textToSend = uint8ArrayToString(data);
     // 先添加发送日志，确保在回环数据之前显示
-    addLog('tx', data, input);
+    addLog('tx', data, textToSend);
     
     // 添加到发送队列
-    sendQueueRef.current.push({ data, text: input });
+    sendQueueRef.current.push({ data, text: textToSend });
     
     // 触发队列处理
     processSendQueue();
