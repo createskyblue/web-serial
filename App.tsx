@@ -716,7 +716,7 @@ const App: React.FC = () => {
         ></div>
         
 
-        <div className="bg-white border-t shadow-sm m-2 mb-2" style={{ height: `${100 - splitPosition}%`, minHeight: '80px' }}>
+        <div className="bg-white shadow-sm m-2 mb-2" style={{ height: `${100 - splitPosition}%`, minHeight: '80px' }}>
           <Sender onSend={sendData} onFileSend={handleFileSend} isConnected={isConnected && !isPaused} isReconnecting={isReconnecting} />
         </div>
       </main>
