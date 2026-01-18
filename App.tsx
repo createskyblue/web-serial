@@ -47,7 +47,10 @@ const App: React.FC = () => {
 
   // WebSocket 相关状态
   const [commMode, setCommMode] = useState<CommMode>(CommMode.Serial);
-  const [wsUrl, setWsUrl] = useState('ws://localhost:8080');
+  const [wsUrl, setWsUrl] = useState(() => {
+    const saved = localStorage.getItem('ws_url');
+    return saved !== null ? saved : 'ws://localhost:8080';
+  });
   const wsRef = useRef<WebSocket | null>(null);
   const shouldReconnectRef = useRef(true); // 控制是否自动重连
   const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null); // 重连定时器
@@ -110,6 +113,11 @@ const App: React.FC = () => {
       setMaxBufferSize(parseInt(saved, 10));
     }
   }, []);
+
+  // 保存WebSocket URL到localStorage
+  useEffect(() => {
+    localStorage.setItem('ws_url', wsUrl);
+  }, [wsUrl]);
 
   useEffect(() => {
     localStorage.setItem('quick_send_list', JSON.stringify(quickSendItems));
