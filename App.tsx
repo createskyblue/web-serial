@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { 
-  SerialConfig, 
-  DataBits, 
-  StopBits, 
-  Parity, 
-  DisplayMode, 
+import {
+  SerialConfig,
+  DataBits,
+  StopBits,
+  Parity,
+  DisplayMode,
   LogEntry,
   QuickSendItem,
-  FileSendMode
+  FileSendMode,
+  CommMode
 } from './types';
 import { 
   uint8ArrayToHex, 
@@ -39,10 +40,16 @@ interface SerialPort {
 const App: React.FC = () => {
   const [port, setPort] = useState<SerialPort | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [isAutoLineBreak, setIsAutoLineBreak] = useState(false); 
-  const [isAutoScroll, setIsAutoScroll] = useState(true); 
+  const [isAutoLineBreak, setIsAutoLineBreak] = useState(false);
+  const [isAutoScroll, setIsAutoScroll] = useState(true);
   const [isPaused, setIsPaused] = useState(false); // 新增暂停状态
   const [maxBufferSize, setMaxBufferSize] = useState(100 * 1024); // 最大缓冲区大小，默认100KB
+
+  // WebSocket 相关状态
+  const [commMode, setCommMode] = useState<CommMode>(CommMode.Serial);
+  const [wsUrl, setWsUrl] = useState('ws://localhost:8080');
+  const wsRef = useRef<WebSocket | null>(null);
+
   const [config, setConfig] = useState<SerialConfig>({
     baudRate: 115200,
     dataBits: DataBits.Eight,
@@ -149,7 +156,8 @@ const App: React.FC = () => {
         timestamp: new Date(),
         type,
         data,
-        text: newText
+        text: newText,
+        byteCount: data.length // 记录实际字节数
       };
       updatedLogs = [...prev, newLog];
       
@@ -185,41 +193,100 @@ const App: React.FC = () => {
   }, [calculateBufferSize]); // 只依赖calculateBufferSize
 
   const disconnect = async () => {
-    keepReadingRef.current = false;
-    if (readerRef.current) {
-      await readerRef.current.cancel();
-      readerRef.current = null;
+    if (commMode === CommMode.WebSocket) {
+      // WebSocket 断开
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      setIsConnected(false);
+      setIsPaused(false);
+      addLog('info', new Uint8Array(), 'WebSocket 已关闭');
+    } else {
+      // 串口断开
+      keepReadingRef.current = false;
+      if (readerRef.current) {
+        await readerRef.current.cancel();
+        readerRef.current = null;
+      }
+      if (port) {
+        try { await port.close(); } catch (e) {}
+        setPort(null);
+      }
+      setIsConnected(false);
+      setIsPaused(false);
+      addLog('info', new Uint8Array(), '串口已关闭');
     }
-    if (port) {
-      try { await port.close(); } catch (e) {}
-      setPort(null);
-    }
-    setIsConnected(false);
-    setIsPaused(false); // 断开连接时取消暂停
-    addLog('info', new Uint8Array(), '串口已关闭');
   };
 
   const connect = async () => {
-    if (!('serial' in navigator)) {
-      alert('您的浏览器不支持 Web Serial API。');
-      return;
-    }
-    try {
-      const selectedPort = await (navigator as any).serial.requestPort();
-      await selectedPort.open({
-        baudRate: config.baudRate,
-        dataBits: config.dataBits,
-        stopBits: config.stopBits,
-        parity: config.parity,
-        flowControl: config.flowControl
-      });
-      setPort(selectedPort);
-      setIsConnected(true);
-      keepReadingRef.current = true;
-      addLog('info', new Uint8Array(), `已连接: ${config.baudRate} bps`);
-      readLoop(selectedPort);
-    } catch (err: any) {
-      addLog('error', new Uint8Array(), `连接失败: ${err.message}`);
+    if (commMode === CommMode.WebSocket) {
+      // WebSocket 连接
+      if (!wsUrl) {
+        alert('请输入 WebSocket 服务器地址');
+        return;
+      }
+      try {
+        const ws = new WebSocket(wsUrl);
+        ws.binaryType = 'arraybuffer';
+
+        ws.onopen = () => {
+          setIsConnected(true);
+          addLog('info', new Uint8Array(), `WebSocket 已连接: ${wsUrl}`);
+        };
+
+        ws.onmessage = (event) => {
+          if (isPausedRef.current) return;
+          let data: Uint8Array;
+          let text: string;
+          if (event.data instanceof ArrayBuffer) {
+            data = new Uint8Array(event.data);
+            text = decoderRef.current.decode(data, { stream: true });
+          } else {
+            text = event.data;
+            data = stringToUint8Array(text);
+          }
+          addLog('rx', data, text);
+        };
+
+        ws.onerror = (error) => {
+          addLog('error', new Uint8Array(), `WebSocket 错误: ${error}`);
+        };
+
+        ws.onclose = () => {
+          setIsConnected(false);
+          setIsPaused(false);
+          wsRef.current = null;
+          addLog('info', new Uint8Array(), 'WebSocket 连接已关闭');
+        };
+
+        wsRef.current = ws;
+      } catch (err: any) {
+        addLog('error', new Uint8Array(), `WebSocket 连接失败: ${err.message}`);
+      }
+    } else {
+      // 串口连接
+      if (!('serial' in navigator)) {
+        alert('您的浏览器不支持 Web Serial API。');
+        return;
+      }
+      try {
+        const selectedPort = await (navigator as any).serial.requestPort();
+        await selectedPort.open({
+          baudRate: config.baudRate,
+          dataBits: config.dataBits,
+          stopBits: config.stopBits,
+          parity: config.parity,
+          flowControl: config.flowControl
+        });
+        setPort(selectedPort);
+        setIsConnected(true);
+        keepReadingRef.current = true;
+        addLog('info', new Uint8Array(), `已连接: ${config.baudRate} bps`);
+        readLoop(selectedPort);
+      } catch (err: any) {
+        addLog('error', new Uint8Array(), `连接失败: ${err.message}`);
+      }
     }
   };
 
@@ -258,10 +325,12 @@ const App: React.FC = () => {
     
     try {
       const data = mode === DisplayMode.Hex ? hexToUint8Array(input) : stringToUint8Array(input);
+      // 先添加发送日志，确保在回环数据之前显示
+      addLog('tx', data, input);
+      // 然后执行发送操作
       const writer = port.writable.getWriter();
       await writer.write(data);
       writer.releaseLock();
-      addLog('tx', data, input);
     } catch (err: any) {
       addLog('error', new Uint8Array(), `发送失败: ${err.message}`);
     }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { SerialConfig, DataBits, StopBits, Parity } from '../types';
+import { SerialConfig, DataBits, StopBits, Parity, CommMode } from '../types';
 
 interface SidebarProps {
   config: SerialConfig;
@@ -12,6 +12,10 @@ interface SidebarProps {
   maxBufferSize: number;
   setMaxBufferSize: (val: number) => void;
   currentBufferSize: number;
+  commMode: CommMode;
+  setCommMode: (val: CommMode) => void;
+  wsUrl: string;
+  setWsUrl: (val: string) => void;
   onConnect: () => void;
   onDisconnect: () => void;
 }
@@ -35,19 +39,23 @@ const formatBufferSize = (bytes: number) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-const Sidebar: React.FC<SidebarProps> = ({ 
-  config, 
-  setConfig, 
-  isConnected, 
-  isAutoLineBreak, 
+const Sidebar: React.FC<SidebarProps> = ({
+  config,
+  setConfig,
+  isConnected,
+  isAutoLineBreak,
   setIsAutoLineBreak,
   isAutoScroll,
   setIsAutoScroll,
   maxBufferSize,
   setMaxBufferSize,
   currentBufferSize,
-  onConnect, 
-  onDisconnect 
+  commMode,
+  setCommMode,
+  wsUrl,
+  setWsUrl,
+  onConnect,
+  onDisconnect
 }) => {
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -74,37 +82,67 @@ const Sidebar: React.FC<SidebarProps> = ({
         
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">波特率</label>
-            <select name="baudRate" value={config.baudRate} onChange={handleChange} disabled={isConnected} className="w-full bg-gray-50 border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 outline-none">
-              {baudRates.map(br => <option key={br} value={br}>{br}</option>)}
+            <label className="block text-sm font-medium text-gray-600 mb-1">通讯模式</label>
+            <select
+              value={commMode}
+              onChange={(e) => setCommMode(e.target.value as CommMode)}
+              disabled={isConnected}
+              className="w-full bg-gray-50 border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 outline-none"
+            >
+              <option value={CommMode.Serial}>串口 (Serial)</option>
+              <option value={CommMode.WebSocket}>WebSocket</option>
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          {commMode === CommMode.WebSocket ? (
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">数据位</label>
-              <select name="dataBits" value={config.dataBits} onChange={handleChange} disabled={isConnected} className="w-full bg-gray-50 border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 outline-none">
-                <option value={DataBits.Seven}>7</option>
-                <option value={DataBits.Eight}>8</option>
-              </select>
+              <label className="block text-sm font-medium text-gray-600 mb-1">WebSocket 服务器地址</label>
+              <input
+                type="text"
+                value={wsUrl}
+                onChange={(e) => setWsUrl(e.target.value)}
+                disabled={isConnected}
+                placeholder="ws://localhost:8080"
+                className="w-full bg-gray-50 border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 outline-none"
+              />
+              <p className="text-xs text-gray-500 mt-1">支持 ws:// 或 wss:// 协议</p>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">停止位</label>
-              <select name="stopBits" value={config.stopBits} onChange={handleChange} disabled={isConnected} className="w-full bg-gray-50 border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 outline-none">
-                <option value={StopBits.One}>1</option>
-                <option value={StopBits.Two}>2</option>
-              </select>
-            </div>
-          </div>
+          ) : (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-1">波特率</label>
+                <select name="baudRate" value={config.baudRate} onChange={handleChange} disabled={isConnected} className="w-full bg-gray-50 border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 outline-none">
+                  {baudRates.map(br => <option key={br} value={br}>{br}</option>)}
+                </select>
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">校验位</label>
-            <select name="parity" value={config.parity} onChange={handleChange} disabled={isConnected} className="w-full bg-gray-50 border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 outline-none">
-              <option value={Parity.None}>None (无)</option>
-              <option value={Parity.Even}>Even (偶)</option>
-              <option value={Parity.Odd}>Odd (奇)</option>
-            </select>
-          </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">数据位</label>
+                  <select name="dataBits" value={config.dataBits} onChange={handleChange} disabled={isConnected} className="w-full bg-gray-50 border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 outline-none">
+                    <option value={DataBits.Seven}>7</option>
+                    <option value={DataBits.Eight}>8</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">停止位</label>
+                  <select name="stopBits" value={config.stopBits} onChange={handleChange} disabled={isConnected} className="w-full bg-gray-50 border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 outline-none">
+                    <option value={StopBits.One}>1</option>
+                    <option value={StopBits.Two}>2</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-1">校验位</label>
+                <select name="parity" value={config.parity} onChange={handleChange} disabled={isConnected} className="w-full bg-gray-50 border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 outline-none">
+                  <option value={Parity.None}>None (无)</option>
+                  <option value={Parity.Even}>Even (偶)</option>
+                  <option value={Parity.Odd}>Odd (奇)</option>
+                </select>
+              </div>
+            </>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-600 mb-1">最大缓冲区大小</label>
@@ -162,11 +200,13 @@ const Sidebar: React.FC<SidebarProps> = ({
       <div className="p-6 space-y-3 bg-white border-t">
         {!isConnected ? (
           <button onClick={onConnect} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition-colors flex items-center justify-center">
-            <i className="fas fa-plug mr-2"></i>开启串口
+            <i className={`fas ${commMode === CommMode.WebSocket ? 'fa-globe' : 'fa-plug'} mr-2`}></i>
+            {commMode === CommMode.WebSocket ? '连接 WebSocket' : '开启串口'}
           </button>
         ) : (
           <button onClick={onDisconnect} className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg shadow-md transition-colors flex items-center justify-center">
-            <i className="fas fa-power-off mr-2"></i>关闭串口
+            <i className="fas fa-power-off mr-2"></i>
+            {commMode === CommMode.WebSocket ? '断开 WebSocket' : '关闭串口'}
           </button>
         )}
         

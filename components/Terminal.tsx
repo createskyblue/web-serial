@@ -46,9 +46,9 @@ const Terminal: React.FC<TerminalProps> = ({ logs, displayMode, isAutoLineBreak,
             {logs.map((log) => (
               <span 
                 key={log.id} 
-                className={`${log.type === 'rx' ? 'text-slate-800' : log.type === 'tx' ? 'text-blue-600 font-bold' : 'text-amber-600 block my-2 text-xs border-l-2 border-amber-200 pl-2'}`}
+                className={`${log.type === 'rx' ? 'text-slate-800' : log.type === 'tx' ? 'text-blue-600' : 'text-amber-600 block my-2 text-xs border-l-2 border-amber-200 pl-2'}`}
               >
-                {log.type === 'tx' ? ` [TX: ${log.text}] ` : 
+                {log.type === 'tx' ? log.text : 
                  log.type === 'rx' ? (displayMode === DisplayMode.Hex ? uint8ArrayToHex(log.data) + ' ' : log.text) : 
                  `串口状态: ${log.text}`}
               </span>
@@ -62,8 +62,8 @@ const Terminal: React.FC<TerminalProps> = ({ logs, displayMode, isAutoLineBreak,
       <div className="bg-white px-4 py-1.5 text-[10px] text-gray-400 flex justify-between border-t border-gray-100 font-sans select-none">
         <div className="flex space-x-4">
           <span>总行数: {logs.length}</span>
-          <span className="text-emerald-600">接收: {logs.filter(l => l.type === 'rx').length}</span>
-          <span className="text-blue-600">发送: {logs.filter(l => l.type === 'tx').length}</span>
+          <span className="text-emerald-600">接收: {logs.filter(l => l.type === 'rx').reduce((sum, l) => sum + l.byteCount, 0)} 字节</span>
+          <span className="text-blue-600">发送: {logs.filter(l => l.type === 'tx').reduce((sum, l) => sum + l.byteCount, 0)} 字节</span>
           {/* 显示每秒换行符频率 */}
           <span className="text-purple-600">换行频率: {lineFrequency !== undefined ? `${lineFrequency} 行/秒` : '0 行/秒'}</span>
         </div>

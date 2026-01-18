@@ -34,12 +34,18 @@ export enum FileSendMode {
   YModem = 'ymodem'
 }
 
+export enum CommMode {
+  Serial = 'serial',
+  WebSocket = 'websocket'
+}
+
 export interface LogEntry {
   id: string;
   timestamp: Date;
   type: 'rx' | 'tx' | 'info' | 'error';
   data: Uint8Array;
   text: string;
+  byteCount: number; // 记录实际接收/发送的字节数
 }
 
 export interface QuickSendItem {
