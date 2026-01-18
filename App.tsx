@@ -84,7 +84,7 @@ const App: React.FC = () => {
   const decoderRef = useRef(new TextDecoder("utf-8", { fatal: false }));
   const isPausedRef = useRef(false); // 使用ref来跟踪暂停状态，确保在异步函数中能获取最新值
   const maxBufferSizeRef = useRef(maxBufferSize); // 使用ref来跟踪maxBufferSize的最新值
-  const sendQueueRef = useRef<{data: Uint8Array, text: string}[]>([]); // 发送队列
+  const sendQueueRef = useRef<{data: Uint8Array, text: string, mode: DisplayMode}[]>([]); // 发送队列
   const isSendingRef = useRef(false); // 是否正在发送
   
   // 用于统计每秒\n的计数器
@@ -372,8 +372,8 @@ const App: React.FC = () => {
     // 先添加发送日志，确保在回环数据之前显示
     addLog('tx', data, textToSend);
     
-    // 添加到发送队列
-    sendQueueRef.current.push({ data, text: textToSend });
+    // 添加到发送队列，包含mode信息
+    sendQueueRef.current.push({ data, text: textToSend, mode });
     
     // 触发队列处理
     processSendQueue();
@@ -535,10 +535,17 @@ const App: React.FC = () => {
         if (commMode === CommMode.WebSocket) {
           // WebSocket 模式发送
           if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-            wsRef.current.send(item.data);
+            // 根据发送模式选择发送方式
+            if (item.mode === DisplayMode.Hex) {
+              // Hex模式：发送字节数据
+              wsRef.current.send(item.data);
+            } else {
+              // Text模式：直接发送文本字符串
+              wsRef.current.send(item.text);
+            }
           }
         } else {
-          // 串口模式发送
+          // 串口模式发送（始终发送字节数据）
           if (port && port.writable) {
             const writer = port.writable.getWriter();
             await writer.write(item.data);
