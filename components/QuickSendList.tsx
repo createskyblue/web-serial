@@ -110,11 +110,11 @@ const QuickSendList: React.FC<QuickSendListProps> = ({ items, onSend, onUpdate, 
                 <button 
                   onClick={() => updateItem(item.id, { mode: DisplayMode.Text })}
                   className={`px-2 py-0.5 text-[9px] rounded ${item.mode === DisplayMode.Text ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}
-                >T</button>
+                >文本模式</button>
                 <button 
                   onClick={() => updateItem(item.id, { mode: DisplayMode.Hex })}
                   className={`px-2 py-0.5 text-[9px] rounded ${item.mode === DisplayMode.Hex ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}
-                >H</button>
+                >HEX</button>
               </div>
               
               <button 
