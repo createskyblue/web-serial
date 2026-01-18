@@ -1,6 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { DisplayMode, FileSendMode } from '../types';
+import { stringToUint8Array, uint8ArrayToString, hexToUint8Array, uint8ArrayToHex } from '../utils/converters';
 
 interface SenderProps {
   onSend: (data: string, mode: DisplayMode) => void;
@@ -51,6 +52,32 @@ const Sender: React.FC<SenderProps> = ({ onSend, onFileSend, isConnected, isReco
     onSend(dataToSend, mode);
   };
 
+  // 切换模式时转换内容
+  const handleModeChange = (newMode: DisplayMode) => {
+    if (newMode === mode || !input) {
+      setMode(newMode);
+      return;
+    }
+
+    try {
+      if (mode === DisplayMode.Text && newMode === DisplayMode.Hex) {
+        // 从文本转Hex
+        const data = stringToUint8Array(input);
+        const hexStr = uint8ArrayToHex(data);
+        setInput(hexStr);
+      } else if (mode === DisplayMode.Hex && newMode === DisplayMode.Text) {
+        // 从Hex转文本
+        const data = hexToUint8Array(input);
+        const textStr = uint8ArrayToString(data);
+        setInput(textStr);
+      }
+      setMode(newMode);
+    } catch (error) {
+      // 转换失败时不切换模式
+      console.error('模式转换失败:', error);
+    }
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -96,8 +123,8 @@ const Sender: React.FC<SenderProps> = ({ onSend, onFileSend, isConnected, isReco
         <div className="flex-1 flex flex-col min-h-0">
           <div className="flex items-center justify-between mb-2 shrink-0">
             <div className="flex space-x-2 bg-gray-100 p-0.5 rounded-md">
-              <button onClick={() => setMode(DisplayMode.Text)} className={`text-[10px] px-2 py-1 rounded transition-colors ${mode === DisplayMode.Text ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}>文本模式</button>
-              <button onClick={() => setMode(DisplayMode.Hex)} className={`text-[10px] px-2 py-1 rounded transition-colors ${mode === DisplayMode.Hex ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}>Hex 模式</button>
+              <button onClick={() => handleModeChange(DisplayMode.Text)} className={`text-[10px] px-2 py-1 rounded transition-colors ${mode === DisplayMode.Text ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}>文本模式</button>
+              <button onClick={() => handleModeChange(DisplayMode.Hex)} className={`text-[10px] px-2 py-1 rounded transition-colors ${mode === DisplayMode.Hex ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}>Hex 模式</button>
             </div>
             
             <div className="flex items-center space-x-3 text-[11px]">
