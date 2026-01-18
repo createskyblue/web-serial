@@ -181,7 +181,7 @@ const Sender: React.FC<SenderProps> = ({ onSend, onFileSend, isConnected }) => {
               <button 
                 onClick={() => fileInputRef.current?.click()}
                 disabled={!isConnected || isSendingFile}
-                className={`flex-1 py-2 rounded-md text-[11px] font-bold transition-all shadow-sm flex items-center justify-center ${
+                className={`flex-1 py-2 rounded-md text-[11px] font-bold transition-all shadow-sm flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed ${
                   isSendingFile ? 'bg-gray-100 text-gray-500' : 'bg-white border border-blue-500 text-blue-600 hover:bg-blue-50'
                 }`}
               >
@@ -191,7 +191,7 @@ const Sender: React.FC<SenderProps> = ({ onSend, onFileSend, isConnected }) => {
               <button 
                 onClick={handleFileSendClick}
                 disabled={!isConnected || isSendingFile || !selectedFile}
-                className={`flex-1 py-2 rounded-md text-[11px] font-bold transition-all shadow-sm flex items-center justify-center ${
+                className={`flex-1 py-2 rounded-md text-[11px] font-bold transition-all shadow-sm flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed ${
                   isSendingFile ? 'bg-amber-100 text-amber-700' : 'bg-blue-600 text-white hover:bg-blue-700'
                 }`}
               >
