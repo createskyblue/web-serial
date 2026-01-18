@@ -82,10 +82,10 @@ const Sender: React.FC<SenderProps> = ({ onSend, onFileSend, isConnected }) => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-4">
+      <div className="flex gap-4 min-h-[140px]">
         {/* 左侧：普通发送区 */}
-        <div className="flex-1 space-y-2">
-          <div className="flex items-center justify-between">
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex items-center justify-between mb-2">
             <div className="flex space-x-2 bg-gray-100 p-0.5 rounded-md">
               <button onClick={() => setMode(DisplayMode.Text)} className={`text-[10px] px-2 py-1 rounded transition-colors ${mode === DisplayMode.Text ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}>文本模式</button>
               <button onClick={() => setMode(DisplayMode.Hex)} className={`text-[10px] px-2 py-1 rounded transition-colors ${mode === DisplayMode.Hex ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}>Hex 模式</button>
@@ -109,11 +109,11 @@ const Sender: React.FC<SenderProps> = ({ onSend, onFileSend, isConnected }) => {
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-1 min-h-0">
             <textarea 
               value={input} onChange={(e) => setInput(e.target.value)}
               placeholder={mode === DisplayMode.Hex ? "输入 Hex (如 01 02 FF)" : "输入文本内容..."}
-              className="flex-1 h-20 p-2 bg-gray-50 border border-gray-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+              className="flex-1 h-full p-2 bg-gray-50 border border-gray-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-blue-500 outline-none resize-none"
             />
             <button 
               onClick={handleSendClick} disabled={!isConnected || !input.trim()}
