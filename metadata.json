@@ -1,5 +1,5 @@
 {
-  "name": "极简网页串口助手",
+  "name": "在线串口/蓝牙/WebSocket调试工具 - 免安装、实时通信测试平台",
   "description": "基于 Web Serial API 的高性能在线串口调试工具，支持自定义波特率、Hex/文本切换及智能日志分析。",
   "requestFramePermissions": [
     "serial"

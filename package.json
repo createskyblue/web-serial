@@ -1,5 +1,5 @@
 {
-  "name": "极简网页串口助手",
+  "name": "在线串口/蓝牙/WebSocket调试工具 - 免安装、实时通信测试平台",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist -r https://github.com/createskyblue/web-serial -b gh-pages"
+    "deploy": "gh-pages -d dist -r https://github.com/createskyblue/web-serial-monitor -b gh-pages"
   },
   "dependencies": {
     "@google/genai": "^1.34.0",
