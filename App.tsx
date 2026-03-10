@@ -258,12 +258,6 @@ const App: React.FC = () => {
     }
 
     setLogs(prev => {
-      // 检查日志数量限制
-      if (prev.length >= 1000) {
-        // 保留后500条，避免频繁数组操作
-        prev = prev.slice(-500);
-      }
-
       const newLog: LogEntry = {
         id: Math.random().toString(36).substr(2, 9),
         timestamp: new Date(),
