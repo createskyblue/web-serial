@@ -154,6 +154,7 @@ const App: React.FC = () => {
   const maxBufferSizeRef = useRef(maxBufferSize); // 使用ref来跟踪maxBufferSize的最新值
   const sendQueueRef = useRef<{data: Uint8Array, text: string, mode: DisplayMode}[]>([]); // 发送队列
   const isSendingRef = useRef(false); // 是否正在发送
+  const isDisconnectingRef = useRef(false); // 是否正在断开中（防止重复触发）
 
   // 用于统计每秒\n的计数器
   const newlineCountRef = useRef(0);
@@ -313,18 +314,8 @@ const App: React.FC = () => {
       addLog('info', new Uint8Array(), 'WebSocket 已关闭');
     } else {
       // 串口断开
-      keepReadingRef.current = false;
-      if (readerRef.current) {
-        await readerRef.current.cancel();
-        readerRef.current = null;
-      }
-      if (port) {
-        try { await port.close(); } catch (e) {}
-        setPort(null);
-      }
-      setIsConnected(false);
-      setIsPaused(false);
       addLog('info', new Uint8Array(), '串口已关闭');
+      await handleSerialDisconnect();
       // 注意：不清除 savedSerialPort，这样下次可以直接连接
     }
   };
@@ -523,6 +514,17 @@ const App: React.FC = () => {
       setPort(targetPort);
       setIsConnected(true);
       keepReadingRef.current = true;
+
+      // 监听串口断开事件（硬件拔除）
+      const onDisconnect = () => {
+        addLog('info', new Uint8Array(), '串口硬件已断开');
+        handleSerialDisconnect();
+      };
+      (targetPort as any).addEventListener('disconnect', onDisconnect);
+
+      // 存储清理函数，用于断开时移除监听
+      (targetPort as any)._disconnectHandler = onDisconnect;
+
       addLog('info', new Uint8Array(), `已连接: ${config.baudRate} bps`);
       readLoop(targetPort);
     } catch (err: any) {
@@ -530,6 +532,60 @@ const App: React.FC = () => {
       // 如果打开失败，清除保存的串口
       setSavedSerialPort(null);
     }
+  };
+
+  // 处理串口断开（硬件拔除或软件关闭）
+  const handleSerialDisconnect = async () => {
+    // 防止重复处理
+    if (isDisconnectingRef.current) return;
+    isDisconnectingRef.current = true;
+
+    keepReadingRef.current = false;
+
+    // 先尝试取消reader，设置超时避免卡死
+    if (readerRef.current) {
+      try {
+        // 使用 Promise.race 添加超时
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('cancel timeout')), 1000)
+        );
+        await Promise.race([readerRef.current.cancel(), timeoutPromise]);
+      } catch (e) {
+        console.log('Reader cancel timeout or error:', e);
+      }
+      readerRef.current = null;
+    }
+
+    // 关闭串口，同样添加超时
+    if (port) {
+      // 清理事件监听器
+      const disconnectHandler = (port as any)._disconnectHandler;
+      if (disconnectHandler) {
+        try {
+          (port as any).removeEventListener('disconnect', disconnectHandler);
+        } catch (e) {
+          // 忽略移除监听器的错误
+        }
+      }
+
+      try {
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('close timeout')), 1000)
+        );
+        await Promise.race([port.close(), timeoutPromise]);
+      } catch (e) {
+        console.log('Port close timeout or error:', e);
+      }
+      setPort(null);
+    }
+
+    setIsConnected(false);
+    setIsPaused(false);
+
+    // 延迟重置标志，防止短时间内重复触发
+    setTimeout(() => {
+      isDisconnectingRef.current = false;
+    }, 500);
   };
 
   const readLoop = async (selectedPort: SerialPort) => {
@@ -542,16 +598,33 @@ const App: React.FC = () => {
           const { value, done } = await reader.read();
           if (done) break;
           // 使用ref检查暂停状态，确保获取最新值
-          if (value && !isPausedRef.current) { 
+          if (value && !isPausedRef.current) {
             const textChunk = decoderRef.current.decode(value, { stream: true });
-            console.log('收到数据:', textChunk); // 调试日志
+            console.log('收到数据:', textChunk);
             addLog('rx', value, textChunk);
           }
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Read error:', error);
+        // 检查是否是硬件断开导致的错误，且未在断开处理中
+        if (!isDisconnectingRef.current && (
+            error.message?.includes('break') ||
+            error.message?.includes('disconnected') ||
+            error.message?.includes('The device has been lost') ||
+            error.name === 'NetworkError' ||
+            error.name === 'NotFoundError')) {
+          addLog('error', new Uint8Array(), '串口读取失败: 硬件已断开');
+          // 触发断开处理
+          handleSerialDisconnect();
+          break;
+        }
       } finally {
-        reader.releaseLock();
+        try {
+          reader.releaseLock();
+        } catch (e) {
+          // 忽略释放锁的错误
+        }
+        readerRef.current = null;
       }
     }
   };
