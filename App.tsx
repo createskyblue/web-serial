@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   SerialConfig,
   DataBits,
@@ -306,12 +306,12 @@ const App: React.FC = () => {
   const currentBufferSize = calculateBufferSize();
 
   // 派生可见日志
-  const visibleLogs = React.useMemo(() => {
+  const visibleLogs = useMemo(() => {
     const startIdx = Math.max(0, logChunks.length - visibleChunkCount);
     return logChunks.slice(startIdx).flat();
   }, [logChunks, visibleChunkCount]);
 
-  const totalLogCount = React.useMemo(() => {
+  const totalLogCount = useMemo(() => {
     let count = 0;
     for (const chunk of logChunks) count += chunk.length;
     return count;
