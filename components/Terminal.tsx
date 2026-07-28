@@ -127,14 +127,14 @@ const Terminal: React.FC<TerminalProps> = ({
                   </span>
                 );
               }
-              // 仅当数据包含换行、或是第一条、或与上条秒数不同时显示时间戳
-              const hasNewline = log.text.includes('\n');
+              // 仅当是第一条、上一条以换行结尾、或秒数变化时显示时间戳
               const isFirst = idx === 0;
               const prevLog = idx > 0 ? logs[idx - 1] : null;
               const prevIsSystem = prevLog && prevLog.type !== 'rx' && prevLog.type !== 'tx';
+              const prevEndsNewline = prevLog && !prevIsSystem && prevLog.text.endsWith('\n');
               const secondChanged = prevLog && !prevIsSystem &&
                 Math.floor(log.timestamp.getTime() / 1000) !== Math.floor(prevLog.timestamp.getTime() / 1000);
-              const showTs = isFirst || hasNewline || secondChanged;
+              const showTs = isFirst || prevEndsNewline || secondChanged;
               return (
                 <span key={log.id} className={log.type === 'tx' ? 'text-blue-600' : 'text-slate-800'}>
                   {showTs && (
