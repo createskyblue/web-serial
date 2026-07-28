@@ -265,12 +265,6 @@ const App: React.FC = () => {
     localStorage.setItem('right_sidebar_collapsed', rightSidebarCollapsed.toString());
   }, [rightSidebarCollapsed]);
 
-  useEffect(() => {
-    if (isAutoScroll) {
-      terminalEndRef.current?.scrollIntoView({ behavior: 'auto' });
-    }
-  }, [visibleLogs, isAutoScroll]);
-
   // 更新频率统计的定时器
   useEffect(() => {
     const frequencyTimer = setInterval(() => {
@@ -319,6 +313,13 @@ const App: React.FC = () => {
 
   const hasMoreChunks = visibleChunkCount < logChunks.length;
   const hiddenChunksCount = Math.max(0, logChunks.length - visibleChunkCount);
+
+  // 自动滚动到底部
+  useEffect(() => {
+    if (isAutoScroll) {
+      terminalEndRef.current?.scrollIntoView({ behavior: 'auto' });
+    }
+  }, [visibleLogs, isAutoScroll]);
 
   // 加载更多块（用户上滚时调用）
   const loadMoreChunks = useCallback(() => {
