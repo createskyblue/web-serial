@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { LogEntry, DisplayMode } from '../types';
 import { uint8ArrayToHex } from '../utils/converters';
 
@@ -10,17 +10,84 @@ interface TerminalProps {
   terminalEndRef: React.RefObject<HTMLDivElement>;
   aiAnalysis: string | null; // Keep prop for compatibility but don't use
   onCloseAi: () => void;
-  lineFrequency?: number; // 新增频率属性
-  totalRxBytes?: number; // 累计接收字节数
-  totalTxBytes?: number; // 累计发送字节数
+  lineFrequency?: number;
+  totalRxBytes?: number;
+  totalTxBytes?: number;
+  totalLogCount?: number;
+  hasMoreChunks?: boolean;
+  hiddenChunksCount?: number;
+  onLoadMore?: () => void;
 }
 
-const Terminal: React.FC<TerminalProps> = ({ logs, displayMode, isAutoLineBreak, isShowTimestamp, terminalEndRef, lineFrequency, totalRxBytes = 0, totalTxBytes = 0 }) => {
+const Terminal: React.FC<TerminalProps> = ({
+  logs, displayMode, isAutoLineBreak, isShowTimestamp, terminalEndRef,
+  lineFrequency, totalRxBytes = 0, totalTxBytes = 0,
+  totalLogCount, hasMoreChunks = false, hiddenChunksCount = 0, onLoadMore
+}) => {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const prevScrollHeightRef = useRef(0);
+  const isLoadingMoreRef = useRef(false);
+
+  // 哨兵元素：当用户滚到顶部时触发加载更多
+  const handleLoadMore = useCallback(() => {
+    if (!onLoadMore || isLoadingMoreRef.current) return;
+    isLoadingMoreRef.current = true;
+
+    // 保存当前滚动高度，用于加载后保持位置
+    if (scrollContainerRef.current) {
+      prevScrollHeightRef.current = scrollContainerRef.current.scrollHeight;
+    }
+    onLoadMore();
+  }, [onLoadMore]);
+
+  // IntersectionObserver 监听哨兵
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || !hasMoreChunks) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          handleLoadMore();
+        }
+      },
+      { root: scrollContainerRef.current, threshold: 0.1 }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMoreChunks, handleLoadMore]);
+
+  // 加载更多块后恢复滚动位置
+  useEffect(() => {
+    if (prevScrollHeightRef.current > 0 && scrollContainerRef.current) {
+      const newScrollHeight = scrollContainerRef.current.scrollHeight;
+      const scrollDiff = newScrollHeight - prevScrollHeightRef.current;
+      scrollContainerRef.current.scrollTop += scrollDiff;
+      prevScrollHeightRef.current = 0;
+      isLoadingMoreRef.current = false;
+    }
+  }, [logs]);
+
   return (
     <div className="flex-1 bg-white rounded-xl overflow-hidden shadow-sm flex flex-col relative border border-gray-200 h-full">
       {/* Logs Window */}
-      <div className={`flex-1 p-4 overflow-y-auto custom-scrollbar font-mono text-[13px] bg-slate-50/20 ${!isAutoLineBreak ? 'whitespace-pre-wrap break-all' : ''}`}>
-        {logs.length === 0 && (
+      <div
+        ref={scrollContainerRef}
+        className={`flex-1 p-4 overflow-y-auto custom-scrollbar font-mono text-[13px] bg-slate-50/20 ${!isAutoLineBreak ? 'whitespace-pre-wrap break-all' : ''}`}
+      >
+        {/* 哨兵元素 - 检测用户上滚 */}
+        <div ref={sentinelRef} className="h-1 w-full" />
+
+        {/* 加载更多提示 */}
+        {hasMoreChunks && (
+          <div className="text-center py-1 text-[10px] text-gray-400 select-none">
+            ↑ 上拉加载更多 (已隐藏 {hiddenChunksCount} 块)
+          </div>
+        )}
+
+        {totalLogCount === 0 && (
           <div className="h-full flex flex-col items-center justify-center text-gray-300">
             <i className="fas fa-terminal text-4xl opacity-20 mb-2"></i>
             <p className="text-xs font-sans">等待串口数据...</p>
@@ -90,14 +157,13 @@ const Terminal: React.FC<TerminalProps> = ({ logs, displayMode, isAutoLineBreak,
       {/* 底部状态栏 */}
       <div className="bg-white px-4 py-1.5 text-[10px] text-gray-400 flex justify-between border-t border-gray-100 font-sans select-none">
         <div className="flex space-x-4">
-          <span>总行数: {logs.length}</span>
+          <span>总行数: {totalLogCount ?? logs.length}</span>
           <span className="text-emerald-600">接收: {totalRxBytes} 字节</span>
           <span className="text-blue-600">发送: {totalTxBytes} 字节</span>
-          {/* 显示每秒换行符频率 */}
           <span className="text-purple-600">换行频率: {lineFrequency !== undefined ? `${lineFrequency} 行/秒` : '0 行/秒'}</span>
         </div>
         <div className="flex items-center space-x-2">
-          <i className={`fas fa-circle text-[6px] ${logs.length > 0 ? 'text-green-500' : 'text-gray-300'}`}></i>
+          <i className={`fas fa-circle text-[6px] ${(totalLogCount ?? logs.length) > 0 ? 'text-green-500' : 'text-gray-300'}`}></i>
           <span>{isAutoLineBreak ? '分行显示' : '原始流'}{isShowTimestamp ? ' · 时间戳' : ''}</span>
         </div>
       </div>

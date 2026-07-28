@@ -137,7 +137,10 @@ const App: React.FC = () => {
     };
   });
   
-  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [logChunks, setLogChunks] = useState<LogEntry[][]>([[]]);
+  const [visibleChunkCount, setVisibleChunkCount] = useState(2);
+  const CHUNK_SIZE = 10 * 1024; // 每个块 10KB
+
   const [displayMode, setDisplayMode] = useState<DisplayMode>(DisplayMode.Text);
 
   // 添加频率统计相关状态
@@ -266,7 +269,7 @@ const App: React.FC = () => {
     if (isAutoScroll) {
       terminalEndRef.current?.scrollIntoView({ behavior: 'auto' });
     }
-  }, [logs, isAutoScroll]);
+  }, [visibleLogs, isAutoScroll]);
 
   // 更新频率统计的定时器
   useEffect(() => {
@@ -284,12 +287,42 @@ const App: React.FC = () => {
     return () => clearInterval(frequencyTimer);
   }, []);
 
-  // 计算当前缓冲区使用量 - 修复重复计算问题
-  const calculateBufferSize = useCallback((logs: LogEntry[]) => {
-    return logs.reduce((total, log) => {
-      // 只计算原始数据大小，不重复计算文本
-      return total + log.data.length;
-    }, 0);
+  // 计算所有块的总数据量
+  const calcChunksSize = (chunks: LogEntry[][]): number => {
+    let total = 0;
+    for (const chunk of chunks) {
+      for (const log of chunk) {
+        total += log.data.length;
+      }
+    }
+    return total;
+  };
+
+  // 计算当前缓冲区使用量（基于所有块）
+  const calculateBufferSize = useCallback(() => {
+    return calcChunksSize(logChunks);
+  }, [logChunks]);
+
+  const currentBufferSize = calculateBufferSize();
+
+  // 派生可见日志
+  const visibleLogs = React.useMemo(() => {
+    const startIdx = Math.max(0, logChunks.length - visibleChunkCount);
+    return logChunks.slice(startIdx).flat();
+  }, [logChunks, visibleChunkCount]);
+
+  const totalLogCount = React.useMemo(() => {
+    let count = 0;
+    for (const chunk of logChunks) count += chunk.length;
+    return count;
+  }, [logChunks]);
+
+  const hasMoreChunks = visibleChunkCount < logChunks.length;
+  const hiddenChunksCount = Math.max(0, logChunks.length - visibleChunkCount);
+
+  // 加载更多块（用户上滚时调用）
+  const loadMoreChunks = useCallback(() => {
+    setVisibleChunkCount(prev => prev + 2);
   }, []);
 
   const addLog = useCallback((type: LogEntry['type'], data: Uint8Array, newText: string) => {
@@ -302,7 +335,7 @@ const App: React.FC = () => {
       setTotalTxBytes(prev => prev + data.length);
     }
 
-    setLogs(prev => {
+    setLogChunks(prev => {
       const newLog: LogEntry = {
         id: Math.random().toString(36).substr(2, 9),
         timestamp: new Date(),
@@ -311,21 +344,29 @@ const App: React.FC = () => {
         text: newText,
         byteCount: data.length
       };
-      let updatedLogs = [...prev, newLog];
 
-      // 检查缓冲区大小限制
-      const currentMaxBufferSize = maxBufferSizeRef.current;
-      const currentSize = calculateBufferSize(updatedLogs);
+      const chunks = prev.map(c => [...c]);
+      const lastChunk = chunks[chunks.length - 1];
+      const lastChunkSize = lastChunk.reduce((sum, log) => sum + log.data.length, 0);
 
-      if (currentSize > currentMaxBufferSize) {
-        // 保留后 95% 的数据，只删除最旧的 5%
-        const keepCount = Math.max(100, Math.floor(updatedLogs.length * 0.95));
-        updatedLogs = updatedLogs.slice(-keepCount);
+      // 如果最后一个块 >= 10KB 且非空，新开一个块
+      if (lastChunkSize >= CHUNK_SIZE && lastChunk.length > 0) {
+        chunks.push([newLog]);
+      } else {
+        chunks[chunks.length - 1] = [...lastChunk, newLog];
       }
 
-      return updatedLogs;
+      // 缓冲区清理：从头部删除整块直到低于限制
+      const maxSize = maxBufferSizeRef.current;
+      while (chunks.length > 1) {
+        const totalSize = calcChunksSize(chunks);
+        if (totalSize <= maxSize) break;
+        chunks.shift();
+      }
+
+      return chunks;
     });
-  }, [calculateBufferSize]);
+  }, []);
 
   const disconnect = async () => {
     if (commMode === CommMode.Bluetooth) {
@@ -694,12 +735,12 @@ const App: React.FC = () => {
   };
 
   const exportLogs = (format: 'txt' | 'bin') => {
-    if (logs.length === 0) return;
+    if (totalLogCount === 0) return;
     let blob: Blob;
     let filename = `serial_log_${new Date().getTime()}`;
 
     // 只导出RX和TX数据，不包含系统日志信息
-    const content = logs.filter(l => l.type === 'rx' || l.type === 'tx').map(l => l.text).join('');
+    const content = logChunks.flat().filter(l => l.type === 'rx' || l.type === 'tx').map(l => l.text).join('');
     blob = new Blob([content], { type: 'text/plain' });
     filename += format === 'txt' ? '.txt' : '.bin';
 
@@ -713,10 +754,10 @@ const App: React.FC = () => {
 
   // 一键复制功能
   const copyLogs = () => {
-    if (logs.length === 0) return;
-    
+    if (totalLogCount === 0) return;
+
     // 只复制RX和TX数据，不包含系统日志信息
-    const content = logs.filter(l => l.type === 'rx' || l.type === 'tx').map(l => l.text).join('');
+    const content = logChunks.flat().filter(l => l.type === 'rx' || l.type === 'tx').map(l => l.text).join('');
     
     navigator.clipboard.writeText(content).then(() => {
       console.log('日志已复制到剪贴板');
@@ -942,8 +983,6 @@ const App: React.FC = () => {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const currentBufferSize = calculateBufferSize(logs);
-
   // 处理分割条拖拽
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -1129,7 +1168,7 @@ const App: React.FC = () => {
             {/* 一键复制按钮 */}
             <button
               onClick={copyLogs}
-              disabled={logs.length === 0}
+              disabled={totalLogCount === 0}
               className="px-4 py-1.5 bg-blue-500 hover:bg-blue-600 text-white border border-blue-600 rounded-md text-xs transition-colors shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <i className="fas fa-copy mr-1"></i> 复制
@@ -1137,7 +1176,8 @@ const App: React.FC = () => {
 
             <button
               onClick={() => {
-                setLogs([]);
+                setLogChunks([[]]);
+                setVisibleChunkCount(2);
                 setTotalRxBytes(0);
                 setTotalTxBytes(0);
               }}
@@ -1164,7 +1204,7 @@ const App: React.FC = () => {
         <div className="flex-1 overflow-hidden flex flex-col" style={{ height: `${splitPosition}%` }}>
           <div className="flex-1 overflow-hidden p-2 flex flex-col">
             <Terminal
-              logs={logs}
+              logs={visibleLogs}
               displayMode={displayMode}
               isAutoLineBreak={isAutoLineBreak}
               isShowTimestamp={isShowTimestamp}
@@ -1174,6 +1214,10 @@ const App: React.FC = () => {
               lineFrequency={lineFrequency}
               totalRxBytes={totalRxBytes}
               totalTxBytes={totalTxBytes}
+              totalLogCount={totalLogCount}
+              hasMoreChunks={hasMoreChunks}
+              hiddenChunksCount={hiddenChunksCount}
+              onLoadMore={loadMoreChunks}
             />
           </div>
         </div>
