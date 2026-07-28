@@ -53,6 +53,15 @@ const Sender: React.FC<SenderProps> = ({ onSend, onFileSend, isConnected, isReco
   const [fileProgress, setFileProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isFileTransferCollapsed, setIsFileTransferCollapsed] = useState(() => {
+    const saved = localStorage.getItem('file_transfer_collapsed');
+    return saved ? saved === 'true' : false;
+  });
+
+  // 持久化文件传输折叠状态
+  useEffect(() => {
+    localStorage.setItem('file_transfer_collapsed', isFileTransferCollapsed.toString());
+  }, [isFileTransferCollapsed]);
 
   // 定时发送逻辑
   useEffect(() => {
@@ -182,15 +191,29 @@ const Sender: React.FC<SenderProps> = ({ onSend, onFileSend, isConnected, isReco
         </div>
 
         {/* 右侧：文件发送区 */}
-        <div className="w-72 p-3 bg-gray-50 border border-gray-200 rounded-lg space-y-3 shrink-0">
-          <div className="flex items-center justify-between">
-            <h3 className="text-[11px] font-bold text-gray-600">文件传输</h3>
-            <div className="flex bg-gray-200 p-0.5 rounded text-[9px]">
-              <button onClick={() => setFileSendMode(FileSendMode.Raw)} className={`px-2 py-0.5 rounded ${fileSendMode === FileSendMode.Raw ? 'bg-white shadow-sm font-bold text-blue-600' : 'text-gray-500'}`}>RAW</button>
-              <button onClick={() => setFileSendMode(FileSendMode.YModem)} className={`px-2 py-0.5 rounded ${fileSendMode === FileSendMode.YModem ? 'bg-white shadow-sm font-bold text-blue-600' : 'text-gray-500'}`}>YModem</button>
+        <div className={`bg-gray-50 border border-gray-200 rounded-lg shrink-0 transition-all duration-200 ${isFileTransferCollapsed ? 'w-auto' : 'w-72 p-3 space-y-3'}`}>
+          {/* 标题栏：始终显示，可折叠/展开 */}
+          <div className={`flex items-center justify-between ${isFileTransferCollapsed ? 'p-2' : ''}`}>
+            <h3 className="text-[11px] font-bold text-gray-600">{isFileTransferCollapsed ? '文件' : '文件传输'}</h3>
+            <div className="flex items-center gap-1">
+              {!isFileTransferCollapsed && (
+                <div className="flex bg-gray-200 p-0.5 rounded text-[9px]">
+                  <button onClick={() => setFileSendMode(FileSendMode.Raw)} className={`px-2 py-0.5 rounded ${fileSendMode === FileSendMode.Raw ? 'bg-white shadow-sm font-bold text-blue-600' : 'text-gray-500'}`}>RAW</button>
+                  <button onClick={() => setFileSendMode(FileSendMode.YModem)} className={`px-2 py-0.5 rounded ${fileSendMode === FileSendMode.YModem ? 'bg-white shadow-sm font-bold text-blue-600' : 'text-gray-500'}`}>YModem</button>
+                </div>
+              )}
+              <button
+                onClick={() => setIsFileTransferCollapsed(!isFileTransferCollapsed)}
+                className="p-0.5 text-gray-400 hover:text-blue-600 rounded transition-colors"
+                title={isFileTransferCollapsed ? '展开文件传输' : '折叠文件传输'}
+              >
+                <i className={`fas ${isFileTransferCollapsed ? 'fa-chevron-up' : 'fa-chevron-down'} text-xs`}></i>
+              </button>
             </div>
           </div>
 
+          {!isFileTransferCollapsed && (
+            <>
           <div className="space-y-2">
             <div className="flex items-center justify-between text-[10px] text-gray-500">
               <span>每批发送 (字节)</span>
@@ -204,7 +227,7 @@ const Sender: React.FC<SenderProps> = ({ onSend, onFileSend, isConnected, isReco
 
           <div className="pt-1">
             <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" />
-            
+
             {/* 显示选中的文件信息 */}
             {selectedFile && (
               <div className="text-[10px] text-gray-600 mb-2 p-2 bg-white border border-gray-200 rounded">
@@ -214,7 +237,7 @@ const Sender: React.FC<SenderProps> = ({ onSend, onFileSend, isConnected, isReco
                 </div>
                 <div className="flex items-center justify-between mt-1">
                   <span>大小: {(selectedFile.size / 1024).toFixed(2)} KB</span>
-                  <button 
+                  <button
                     onClick={() => setSelectedFile(null)}
                     className="text-red-500 hover:text-red-700"
                   >
@@ -226,7 +249,7 @@ const Sender: React.FC<SenderProps> = ({ onSend, onFileSend, isConnected, isReco
 
             {/* 两个按钮：选择文件和发送 */}
             <div className="flex gap-2">
-              <button 
+              <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={(!isConnected && !isReconnecting) || isSendingFile}
                 className={`flex-1 py-2 rounded-md text-[11px] font-bold transition-all shadow-sm flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed ${
@@ -236,7 +259,7 @@ const Sender: React.FC<SenderProps> = ({ onSend, onFileSend, isConnected, isReco
                 <i className="fas fa-folder-open mr-2"></i>
                 选择文件
               </button>
-              <button 
+              <button
                 onClick={handleFileSendClick}
                 disabled={(!isConnected && !isReconnecting) || isSendingFile || !selectedFile}
                 className={`flex-1 py-2 rounded-md text-[11px] font-bold transition-all shadow-sm flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed ${
@@ -247,13 +270,15 @@ const Sender: React.FC<SenderProps> = ({ onSend, onFileSend, isConnected, isReco
                 {isSendingFile ? `发送中 ${fileProgress}%` : '发送'}
               </button>
             </div>
-            
+
             {isSendingFile && (
               <div className="w-full bg-gray-200 rounded-full h-1 mt-2">
                 <div className="bg-amber-500 h-1 rounded-full transition-all" style={{ width: `${fileProgress}%` }}></div>
               </div>
             )}
           </div>
+            </>
+          )}
         </div>
       </div>
     </div>
