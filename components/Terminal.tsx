@@ -116,9 +116,9 @@ const Terminal: React.FC<TerminalProps> = ({
             </div>
           ))
         ) : isShowTimestamp ? (
-          /* 非强制换行模式 + 显示时间戳：内联显示时间戳 */
+          /* 非强制换行模式 + 显示时间戳：仅在换行或秒变化时显示 */
           <div className="inline">
-            {logs.map((log) => {
+            {logs.map((log, idx) => {
               const isSystem = log.type !== 'rx' && log.type !== 'tx';
               if (isSystem) {
                 return (
@@ -127,11 +127,21 @@ const Terminal: React.FC<TerminalProps> = ({
                   </span>
                 );
               }
+              // 仅当数据包含换行、或是第一条、或与上条秒数不同时显示时间戳
+              const hasNewline = log.text.includes('\n');
+              const isFirst = idx === 0;
+              const prevLog = idx > 0 ? logs[idx - 1] : null;
+              const prevIsSystem = prevLog && prevLog.type !== 'rx' && prevLog.type !== 'tx';
+              const secondChanged = prevLog && !prevIsSystem &&
+                Math.floor(log.timestamp.getTime() / 1000) !== Math.floor(prevLog.timestamp.getTime() / 1000);
+              const showTs = isFirst || hasNewline || secondChanged;
               return (
                 <span key={log.id} className={log.type === 'tx' ? 'text-blue-600' : 'text-slate-800'}>
-                  <span className="text-gray-400 text-[10px] select-none opacity-70 mr-1">
-                    [{log.timestamp.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalDigits: 3 } as any)}]
-                  </span>
+                  {showTs && (
+                    <span className="text-gray-400 text-[10px] select-none opacity-70 mr-1">
+                      [{log.timestamp.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalDigits: 3 } as any)}]
+                    </span>
+                  )}
                   {displayMode === DisplayMode.Hex ? uint8ArrayToHex(log.data) + ' ' : log.text}
                 </span>
               );
