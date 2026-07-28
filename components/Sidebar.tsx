@@ -21,6 +21,8 @@ interface SidebarProps {
   isConnected: boolean;
   isAutoLineBreak: boolean;
   setIsAutoLineBreak: (val: boolean) => void;
+  isShowTimestamp: boolean;
+  setIsShowTimestamp: (val: boolean) => void;
   isAutoScroll: boolean;
   setIsAutoScroll: (val: boolean) => void;
   maxBufferSize: number;
@@ -42,6 +44,9 @@ interface SidebarProps {
   // 串口选择相关
   hasSavedSerialPort?: boolean;
   onReselectSerialPort?: () => void;
+  // 折叠相关
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
 const baudRates = [9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600, 1000000, 1500000, 2000000];
@@ -112,6 +117,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   isConnected,
   isAutoLineBreak,
   setIsAutoLineBreak,
+  isShowTimestamp,
+  setIsShowTimestamp,
   isAutoScroll,
   setIsAutoScroll,
   maxBufferSize,
@@ -131,7 +138,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   onDisconnect,
   isReconnecting = false,
   hasSavedSerialPort = false,
-  onReselectSerialPort
+  onReselectSerialPort,
+  isCollapsed,
+  onToggleCollapse
 }) => {
   // 自定义波特率状态
   const [isCustomBaudRate, setIsCustomBaudRate] = useState(() => {
@@ -204,11 +213,33 @@ const Sidebar: React.FC<SidebarProps> = ({
   const isBufferNearLimit = bufferUsagePercent > 80;
 
   return (
-    <aside className="w-72 bg-white border-r flex flex-col h-full shadow-sm z-20">
+    <aside className="w-full bg-white border-r flex flex-col h-full shadow-sm z-20">
+      {/* 折叠状态：只显示展开按钮 */}
+      {isCollapsed ? (
+        <div className="flex flex-col items-center py-4 h-full">
+          <button
+            onClick={onToggleCollapse}
+            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+            title="展开侧边栏 ([)"
+          >
+            <i className="fas fa-chevron-right text-sm"></i>
+          </button>
+        </div>
+      ) : (
+        <>
       <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
-        <h2 className="text-lg font-bold mb-6 text-gray-700 border-b pb-2 flex items-center">
+        <h2 className="text-lg font-bold mb-6 text-gray-700 border-b pb-2 flex items-center justify-between">
+          <span className="flex items-center">
           <i className="fas fa-cog mr-2 text-blue-500"></i>
           配置参数
+          </span>
+          <button
+            onClick={onToggleCollapse}
+            className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+            title="折叠侧边栏 ([)"
+          >
+            <i className="fas fa-chevron-left text-sm"></i>
+          </button>
         </h2>
         
         <div className="space-y-4">
@@ -362,18 +393,28 @@ const Sidebar: React.FC<SidebarProps> = ({
             <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">终端设置</label>
             <div className="space-y-3 p-3 bg-gray-50 rounded-md border border-gray-200">
               <label className="flex items-center text-xs text-gray-700 cursor-pointer">
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
+                  checked={isShowTimestamp}
+                  onChange={(e) => setIsShowTimestamp(e.target.checked)}
+                  className="mr-2 rounded text-blue-600 focus:ring-0"
+                />
+                <span>显示时间戳</span>
+              </label>
+
+              <label className="flex items-center text-xs text-gray-700 cursor-pointer">
+                <input
+                  type="checkbox"
                   checked={isAutoLineBreak}
                   onChange={(e) => setIsAutoLineBreak(e.target.checked)}
                   className="mr-2 rounded text-blue-600 focus:ring-0"
                 />
                 <span>按数据包强制换行</span>
               </label>
-              
+
               <label className="flex items-center text-xs text-gray-700 cursor-pointer">
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   checked={isAutoScroll}
                   onChange={(e) => setIsAutoScroll(e.target.checked)}
                   className="mr-2 rounded text-blue-600 focus:ring-0"
@@ -423,6 +464,8 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
       </div>
+        </>
+      )}
     </aside>
   );
 };

@@ -73,6 +73,10 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('is_auto_line_break');
     return saved ? saved === 'true' : false;
   });
+  const [isShowTimestamp, setIsShowTimestamp] = useState(() => {
+    const saved = localStorage.getItem('is_show_timestamp');
+    return saved ? saved === 'true' : false;
+  });
   const [isAutoScroll, setIsAutoScroll] = useState(() => {
     const saved = localStorage.getItem('is_auto_scroll');
     return saved ? saved === 'true' : true;
@@ -140,6 +144,26 @@ const App: React.FC = () => {
   const [lineFrequency, setLineFrequency] = useState(0);
   const [splitPosition, setSplitPosition] = useState(60); // 分割条位置（百分比）
   const [isDragging, setIsDragging] = useState(false);
+
+  // 侧边栏宽度和折叠状态
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState(() => {
+    const saved = localStorage.getItem('left_sidebar_width');
+    return saved ? parseInt(saved, 10) : 288;
+  });
+  const [rightSidebarWidth, setRightSidebarWidth] = useState(() => {
+    const saved = localStorage.getItem('right_sidebar_width');
+    return saved ? parseInt(saved, 10) : 320;
+  });
+  const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(() => {
+    const saved = localStorage.getItem('left_sidebar_collapsed');
+    return saved ? saved === 'true' : false;
+  });
+  const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(() => {
+    const saved = localStorage.getItem('right_sidebar_collapsed');
+    return saved ? saved === 'true' : false;
+  });
+  const [isDraggingLeftSidebar, setIsDraggingLeftSidebar] = useState(false);
+  const [isDraggingRightSidebar, setIsDraggingRightSidebar] = useState(false);
 
   const [quickSendItems, setQuickSendItems] = useState<QuickSendItem[]>(() => {
     const saved = localStorage.getItem('quick_send_list');
@@ -211,12 +235,32 @@ const App: React.FC = () => {
   }, [isAutoLineBreak]);
 
   useEffect(() => {
+    localStorage.setItem('is_show_timestamp', isShowTimestamp.toString());
+  }, [isShowTimestamp]);
+
+  useEffect(() => {
     localStorage.setItem('is_auto_scroll', isAutoScroll.toString());
   }, [isAutoScroll]);
 
   useEffect(() => {
     localStorage.setItem('quick_send_list', JSON.stringify(quickSendItems));
   }, [quickSendItems]);
+
+  useEffect(() => {
+    localStorage.setItem('left_sidebar_width', leftSidebarWidth.toString());
+  }, [leftSidebarWidth]);
+
+  useEffect(() => {
+    localStorage.setItem('right_sidebar_width', rightSidebarWidth.toString());
+  }, [rightSidebarWidth]);
+
+  useEffect(() => {
+    localStorage.setItem('left_sidebar_collapsed', leftSidebarCollapsed.toString());
+  }, [leftSidebarCollapsed]);
+
+  useEffect(() => {
+    localStorage.setItem('right_sidebar_collapsed', rightSidebarCollapsed.toString());
+  }, [rightSidebarCollapsed]);
 
   useEffect(() => {
     if (isAutoScroll) {
@@ -914,12 +958,12 @@ const App: React.FC = () => {
     const handleMouseMove = (e: MouseEvent) => {
       const mainElement = document.querySelector('main');
       if (!mainElement) return;
-      
+
       const rect = mainElement.getBoundingClientRect();
       const headerHeight = rect.top + 56; // header height approximately
       const footerHeight = 80; // sender minimum height
       const totalHeight = window.innerHeight - headerHeight - footerHeight;
-      
+
       // 计算新的分割位置（限制在10%-90%之间）
       const relativeY = e.clientY - headerHeight;
       const newPercent = Math.max(10, Math.min(90, (relativeY / (window.innerHeight - headerHeight - footerHeight)) * 100));
@@ -941,52 +985,130 @@ const App: React.FC = () => {
     };
   }, [isDragging]);
 
+  // 左侧边栏拖拽调整宽度
+  useEffect(() => {
+    if (!isDraggingLeftSidebar) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const newWidth = Math.max(200, Math.min(500, e.clientX));
+      setLeftSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingLeftSidebar(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingLeftSidebar]);
+
+  // 右侧边栏拖拽调整宽度
+  useEffect(() => {
+    if (!isDraggingRightSidebar) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const newWidth = Math.max(200, Math.min(500, window.innerWidth - e.clientX));
+      setRightSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingRightSidebar(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingRightSidebar]);
+
+  // 键盘快捷键： [ 折叠/展开左侧栏， ] 折叠/展开右侧栏
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // 不在输入框中响应快捷键
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      if (e.key === '[') {
+        e.preventDefault();
+        setLeftSidebarCollapsed(prev => !prev);
+      } else if (e.key === ']') {
+        e.preventDefault();
+        setRightSidebarCollapsed(prev => !prev);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden text-gray-800">
-      <Sidebar
-        config={config} setConfig={setConfig} isConnected={isConnected}
-        isAutoLineBreak={isAutoLineBreak} setIsAutoLineBreak={setIsAutoLineBreak}
-        isAutoScroll={isAutoScroll} setIsAutoScroll={setIsAutoScroll}
-        maxBufferSize={maxBufferSize} setMaxBufferSize={setMaxBufferSize}
-        currentBufferSize={currentBufferSize}
-        commMode={commMode} setCommMode={setCommMode}
-        wsUrl={wsUrl} setWsUrl={setWsUrl}
-        bluetoothServiceUUID={bluetoothServiceUUID} setBluetoothServiceUUID={setBluetoothServiceUUID}
-        bluetoothTxCharacteristicUUID={bluetoothTxCharacteristicUUID} setBluetoothTxCharacteristicUUID={setBluetoothTxCharacteristicUUID}
-        bluetoothRxCharacteristicUUID={bluetoothRxCharacteristicUUID} setBluetoothRxCharacteristicUUID={setBluetoothRxCharacteristicUUID}
-        onConnect={connect} onDisconnect={disconnect}
-        isReconnecting={isReconnecting}
-        hasSavedSerialPort={!!savedSerialPort}
-        onReselectSerialPort={async () => {
-          if (!('serial' in navigator)) return;
-          try {
-            const newPort = await (navigator as any).serial.requestPort();
-            setSavedSerialPort(newPort);
-            addLog('info', new Uint8Array(), '已选择新串口，点击"连接串口"按钮连接');
-          } catch (err: any) {
-            addLog('error', new Uint8Array(), `选择串口失败: ${err.message}`);
-          }
-        }}
-      />
+      {/* 左侧边栏 */}
+      <div
+        className="relative shrink-0 overflow-hidden transition-[width] duration-200 z-20"
+        style={{ width: leftSidebarCollapsed ? 36 : leftSidebarWidth }}
+      >
+        <Sidebar
+          config={config} setConfig={setConfig} isConnected={isConnected}
+          isAutoLineBreak={isAutoLineBreak} setIsAutoLineBreak={setIsAutoLineBreak}
+          isShowTimestamp={isShowTimestamp} setIsShowTimestamp={setIsShowTimestamp}
+          isAutoScroll={isAutoScroll} setIsAutoScroll={setIsAutoScroll}
+          maxBufferSize={maxBufferSize} setMaxBufferSize={setMaxBufferSize}
+          currentBufferSize={currentBufferSize}
+          commMode={commMode} setCommMode={setCommMode}
+          wsUrl={wsUrl} setWsUrl={setWsUrl}
+          bluetoothServiceUUID={bluetoothServiceUUID} setBluetoothServiceUUID={setBluetoothServiceUUID}
+          bluetoothTxCharacteristicUUID={bluetoothTxCharacteristicUUID} setBluetoothTxCharacteristicUUID={setBluetoothTxCharacteristicUUID}
+          bluetoothRxCharacteristicUUID={bluetoothRxCharacteristicUUID} setBluetoothRxCharacteristicUUID={setBluetoothRxCharacteristicUUID}
+          onConnect={connect} onDisconnect={disconnect}
+          isReconnecting={isReconnecting}
+          hasSavedSerialPort={!!savedSerialPort}
+          isCollapsed={leftSidebarCollapsed}
+          onToggleCollapse={() => setLeftSidebarCollapsed(prev => !prev)}
+          onReselectSerialPort={async () => {
+            if (!('serial' in navigator)) return;
+            try {
+              const newPort = await (navigator as any).serial.requestPort();
+              setSavedSerialPort(newPort);
+              addLog('info', new Uint8Array(), '已选择新串口，点击"连接串口"按钮连接');
+            } catch (err: any) {
+              addLog('error', new Uint8Array(), `选择串口失败: ${err.message}`);
+            }
+          }}
+        />
+        {/* 左侧栏拖拽调整大小手柄 */}
+        {!leftSidebarCollapsed && (
+          <div
+            className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-blue-400 active:bg-blue-500 transition-colors z-30"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setIsDraggingLeftSidebar(true);
+              document.body.style.cursor = 'col-resize';
+              document.body.style.userSelect = 'none';
+            }}
+          />
+        )}
+      </div>
 
-      <main className="flex-1 flex flex-col min-w-0 bg-white">
-        <header className="bg-white border-b px-6 py-3 flex items-center justify-between shadow-sm z-10">
+      <main className="flex-1 flex flex-col min-w-0 bg-white relative z-10">
+        <header className="bg-white border-b px-6 py-3 flex items-center justify-between shadow-sm">
           <div className="flex items-center space-x-4">
             <h1 className="text-xl font-bold text-blue-600 flex items-center">
               <i className="fas fa-microchip mr-2"></i>
               Web Serial Tool
             </h1>
-            <div className={`px-2 py-0.5 rounded text-[10px] font-bold ${isConnected ? 'bg-green-500 text-white' : 'bg-gray-400 text-white'}`}>
-              {isConnected ? '已连接' : '未连接'}
-            </div>
-            {isConnected && (
-              <div className={`px-2 py-0.5 rounded text-[10px] font-bold ${isPaused ? 'bg-orange-500 text-white' : 'bg-blue-500 text-white'}`}>
-                {isPaused ? '已暂停' : '运行中'}
-              </div>
-            )}
-            <div className={`px-2 py-0.5 rounded text-[10px] font-bold ${currentBufferSize > maxBufferSize * 0.8 ? 'bg-red-500 text-white' : 'bg-gray-500 text-white'}`}>
-              缓冲区: {formatBufferSize(currentBufferSize)}/{formatBufferSize(maxBufferSize)}
-            </div>
           </div>
           
           <div className="flex items-center space-x-3">
@@ -1005,28 +1127,14 @@ const App: React.FC = () => {
             </div>
             
             {/* 一键复制按钮 */}
-            <button 
+            <button
               onClick={copyLogs}
               disabled={logs.length === 0}
               className="px-4 py-1.5 bg-blue-500 hover:bg-blue-600 text-white border border-blue-600 rounded-md text-xs transition-colors shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <i className="fas fa-copy mr-1"></i> 复制
             </button>
-            
-            {/* 暂停按钮 */}
-            <button 
-              onClick={togglePause}
-              disabled={!isConnected}
-              className={`px-4 py-1.5 border rounded-md text-xs transition-colors shadow-sm ${
-                isPaused 
-                  ? 'bg-orange-500 hover:bg-orange-600 text-white border-orange-600' 
-                  : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-300'
-              } disabled:opacity-30 disabled:cursor-not-allowed`}
-            >
-              <i className={`fas ${isPaused ? 'fa-play' : 'fa-pause'} mr-1`}></i>
-              {isPaused ? '恢复' : '暂停'}
-            </button>
-            
+
             <button
               onClick={() => {
                 setLogs([]);
@@ -1059,6 +1167,7 @@ const App: React.FC = () => {
               logs={logs}
               displayMode={displayMode}
               isAutoLineBreak={isAutoLineBreak}
+              isShowTimestamp={isShowTimestamp}
               terminalEndRef={terminalEndRef}
               aiAnalysis={null}
               onCloseAi={() => {}}
@@ -1081,7 +1190,30 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      <QuickSendList items={quickSendItems} onUpdate={setQuickSendItems} onSend={sendData} isConnected={isConnected && !isPaused} isReconnecting={isReconnecting} />
+      {/* 右侧边栏 */}
+      <div
+        className="relative shrink-0 overflow-hidden transition-[width] duration-200 z-20"
+        style={{ width: rightSidebarCollapsed ? 36 : rightSidebarWidth }}
+      >
+        {/* 右侧栏拖拽调整大小手柄 */}
+        {!rightSidebarCollapsed && (
+          <div
+            className="absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-blue-400 active:bg-blue-500 transition-colors z-30"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setIsDraggingRightSidebar(true);
+              document.body.style.cursor = 'col-resize';
+              document.body.style.userSelect = 'none';
+            }}
+          />
+        )}
+        <QuickSendList
+          items={quickSendItems} onUpdate={setQuickSendItems} onSend={sendData}
+          isConnected={isConnected && !isPaused} isReconnecting={isReconnecting}
+          isCollapsed={rightSidebarCollapsed}
+          onToggleCollapse={() => setRightSidebarCollapsed(prev => !prev)}
+        />
+      </div>
     </div>
   );
 };

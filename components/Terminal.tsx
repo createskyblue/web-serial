@@ -6,6 +6,7 @@ interface TerminalProps {
   logs: LogEntry[];
   displayMode: DisplayMode;
   isAutoLineBreak: boolean;
+  isShowTimestamp: boolean;
   terminalEndRef: React.RefObject<HTMLDivElement>;
   aiAnalysis: string | null; // Keep prop for compatibility but don't use
   onCloseAi: () => void;
@@ -14,7 +15,7 @@ interface TerminalProps {
   totalTxBytes?: number; // 累计发送字节数
 }
 
-const Terminal: React.FC<TerminalProps> = ({ logs, displayMode, isAutoLineBreak, terminalEndRef, lineFrequency, totalRxBytes = 0, totalTxBytes = 0 }) => {
+const Terminal: React.FC<TerminalProps> = ({ logs, displayMode, isAutoLineBreak, isShowTimestamp, terminalEndRef, lineFrequency, totalRxBytes = 0, totalTxBytes = 0 }) => {
   return (
     <div className="flex-1 bg-white rounded-xl overflow-hidden shadow-sm flex flex-col relative border border-gray-200 h-full">
       {/* Logs Window */}
@@ -29,31 +30,55 @@ const Terminal: React.FC<TerminalProps> = ({ logs, displayMode, isAutoLineBreak,
         {isAutoLineBreak ? (
           logs.map((log) => (
             <div key={log.id} className="flex px-1 mb-1 hover:bg-gray-100 rounded">
-              <span className="text-gray-400 mr-3 w-24 shrink-0 text-[11px] select-none opacity-80">
-                {log.timestamp.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalDigits: 3 } as any)}
-              </span>
+              {isShowTimestamp && (
+                <span className="text-gray-400 mr-3 w-24 shrink-0 text-[11px] select-none opacity-80">
+                  {log.timestamp.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalDigits: 3 } as any)}
+                </span>
+              )}
               <span className={`mr-2 w-10 shrink-0 font-bold text-center rounded text-[9px] py-0.5 self-center ${
-                log.type === 'rx' ? 'bg-emerald-100 text-emerald-700' : 
+                log.type === 'rx' ? 'bg-emerald-100 text-emerald-700' :
                 log.type === 'tx' ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-700'
               }`}>
                 {log.type === 'rx' ? 'RX' : log.type === 'tx' ? 'TX' : 'SYS'}
               </span>
               <span className={`break-all leading-relaxed ${log.type === 'rx' ? 'text-slate-800' : log.type === 'tx' ? 'text-blue-600' : 'text-slate-400 italic'}`}>
-                {log.type === 'rx' ? (displayMode === DisplayMode.Hex ? uint8ArrayToHex(log.data) : log.text) : 
-                 log.type === 'tx' ? (displayMode === DisplayMode.Hex ? uint8ArrayToHex(log.data) + ' ' : log.text) : 
+                {log.type === 'rx' ? (displayMode === DisplayMode.Hex ? uint8ArrayToHex(log.data) : log.text) :
+                 log.type === 'tx' ? (displayMode === DisplayMode.Hex ? uint8ArrayToHex(log.data) + ' ' : log.text) :
                  log.text}
               </span>
             </div>
           ))
+        ) : isShowTimestamp ? (
+          /* 非强制换行模式 + 显示时间戳：内联显示时间戳 */
+          <div className="inline">
+            {logs.map((log) => {
+              const isSystem = log.type !== 'rx' && log.type !== 'tx';
+              if (isSystem) {
+                return (
+                  <span key={log.id} className="text-amber-600 block my-2 text-xs border-l-2 border-amber-200 pl-2">
+                    串口状态: {log.text}
+                  </span>
+                );
+              }
+              return (
+                <span key={log.id} className={log.type === 'tx' ? 'text-blue-600' : 'text-slate-800'}>
+                  <span className="text-gray-400 text-[10px] select-none opacity-70 mr-1">
+                    [{log.timestamp.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalDigits: 3 } as any)}]
+                  </span>
+                  {displayMode === DisplayMode.Hex ? uint8ArrayToHex(log.data) + ' ' : log.text}
+                </span>
+              );
+            })}
+          </div>
         ) : (
           <div className="inline">
             {logs.map((log) => (
-              <span 
-                key={log.id} 
+              <span
+                key={log.id}
                 className={`${log.type === 'rx' ? 'text-slate-800' : log.type === 'tx' ? 'text-blue-600' : 'text-amber-600 block my-2 text-xs border-l-2 border-amber-200 pl-2'}`}
               >
-                {log.type === 'tx' ? (displayMode === DisplayMode.Hex ? uint8ArrayToHex(log.data) + ' ' : log.text) : 
-                 log.type === 'rx' ? (displayMode === DisplayMode.Hex ? uint8ArrayToHex(log.data) + ' ' : log.text) : 
+                {log.type === 'tx' ? (displayMode === DisplayMode.Hex ? uint8ArrayToHex(log.data) + ' ' : log.text) :
+                 log.type === 'rx' ? (displayMode === DisplayMode.Hex ? uint8ArrayToHex(log.data) + ' ' : log.text) :
                  `串口状态: ${log.text}`}
               </span>
             ))}
@@ -73,7 +98,7 @@ const Terminal: React.FC<TerminalProps> = ({ logs, displayMode, isAutoLineBreak,
         </div>
         <div className="flex items-center space-x-2">
           <i className={`fas fa-circle text-[6px] ${logs.length > 0 ? 'text-green-500' : 'text-gray-300'}`}></i>
-          <span>{isAutoLineBreak ? '分行显示' : '原始流'}</span>
+          <span>{isAutoLineBreak ? '分行显示' : '原始流'}{isShowTimestamp ? ' · 时间戳' : ''}</span>
         </div>
       </div>
     </div>

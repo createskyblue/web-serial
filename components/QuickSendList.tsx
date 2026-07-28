@@ -8,9 +8,11 @@ interface QuickSendListProps {
   onUpdate: (items: QuickSendItem[]) => void;
   isConnected: boolean;
   isReconnecting?: boolean;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
-const QuickSendList: React.FC<QuickSendListProps> = ({ items, onSend, onUpdate, isConnected, isReconnecting = false }) => {
+const QuickSendList: React.FC<QuickSendListProps> = ({ items, onSend, onUpdate, isConnected, isReconnecting = false, isCollapsed, onToggleCollapse }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addItem = () => {
@@ -61,7 +63,20 @@ const QuickSendList: React.FC<QuickSendListProps> = ({ items, onSend, onUpdate, 
   };
 
   return (
-    <aside className="w-80 bg-white border-l flex flex-col h-full shadow-sm z-20">
+    <aside className="w-full bg-white border-l flex flex-col h-full shadow-sm z-20">
+      {/* 折叠状态：只显示展开按钮 */}
+      {isCollapsed ? (
+        <div className="flex flex-col items-center py-4 h-full">
+          <button
+            onClick={onToggleCollapse}
+            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+            title="展开侧边栏 (])"
+          >
+            <i className="fas fa-chevron-left text-sm"></i>
+          </button>
+        </div>
+      ) : (
+        <>
       <div className="p-4 border-b bg-gray-50/50 flex items-center justify-between">
         <h2 className="text-sm font-bold text-gray-700 flex items-center">
           <i className="fas fa-bolt mr-2 text-yellow-500"></i>
@@ -73,6 +88,13 @@ const QuickSendList: React.FC<QuickSendListProps> = ({ items, onSend, onUpdate, 
           </button>
           <button onClick={exportData} className="p-1.5 text-xs text-gray-500 hover:text-blue-600 hover:bg-white rounded transition-colors" title="导出">
             <i className="fas fa-file-export"></i>
+          </button>
+          <button
+            onClick={onToggleCollapse}
+            className="p-1.5 text-xs text-gray-400 hover:text-blue-600 hover:bg-white rounded transition-colors"
+            title="折叠侧边栏 (])"
+          >
+            <i className="fas fa-chevron-right text-sm"></i>
           </button>
           <input type="file" ref={fileInputRef} onChange={handleImport} className="hidden" accept=".json" />
         </div>
@@ -87,7 +109,7 @@ const QuickSendList: React.FC<QuickSendListProps> = ({ items, onSend, onUpdate, 
         {items.map((item) => (
           <div key={item.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-200 transition-colors group">
             <div className="flex items-center justify-between mb-2">
-              <input 
+              <input
                 value={item.label}
                 onChange={(e) => updateItem(item.id, { label: e.target.value })}
                 className="bg-transparent text-[11px] font-bold text-gray-600 focus:outline-none focus:text-blue-600 w-2/3"
@@ -97,27 +119,27 @@ const QuickSendList: React.FC<QuickSendListProps> = ({ items, onSend, onUpdate, 
                 <i className="fas fa-times-circle text-xs"></i>
               </button>
             </div>
-            
-            <textarea 
+
+            <textarea
               value={item.content}
               onChange={(e) => updateItem(item.id, { content: e.target.value })}
               className="w-full text-xs font-mono p-2 bg-white border border-gray-200 rounded mb-2 h-12 outline-none focus:border-blue-300 resize-none"
               placeholder="内容..."
             />
-            
+
             <div className="flex items-center justify-between">
               <div className="flex bg-gray-200 p-0.5 rounded">
-                <button 
+                <button
                   onClick={() => updateItem(item.id, { mode: DisplayMode.Text })}
                   className={`px-2 py-0.5 text-[9px] rounded ${item.mode === DisplayMode.Text ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}
                 >文本模式</button>
-                <button 
+                <button
                   onClick={() => updateItem(item.id, { mode: DisplayMode.Hex })}
                   className={`px-2 py-0.5 text-[9px] rounded ${item.mode === DisplayMode.Hex ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}
                 >HEX</button>
               </div>
-              
-              <button 
+
+              <button
                 onClick={() => onSend(item.content, item.mode)}
                 disabled={(!isConnected && !isReconnecting) || !item.content}
                 className="px-4 py-1 bg-blue-500 hover:bg-blue-600 disabled:opacity-30 text-white text-[10px] font-bold rounded shadow-sm transition-colors flex items-center"
@@ -130,13 +152,15 @@ const QuickSendList: React.FC<QuickSendListProps> = ({ items, onSend, onUpdate, 
       </div>
 
       <div className="p-4 border-t">
-        <button 
+        <button
           onClick={addItem}
           className="w-full py-2 bg-white border-2 border-dashed border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-500 hover:text-blue-600 rounded-lg text-xs font-medium transition-all"
         >
           <i className="fas fa-plus mr-1"></i> 添加快捷指令
         </button>
       </div>
+        </>
+      )}
     </aside>
   );
 };
