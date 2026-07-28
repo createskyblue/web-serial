@@ -69,9 +69,13 @@ const App: React.FC = () => {
   // 串口选择状态管理
   const [savedSerialPort, setSavedSerialPort] = useState<SerialPort | null>(null);
 
-  const [isAutoLineBreak, setIsAutoLineBreak] = useState(() => {
-    const saved = localStorage.getItem('is_auto_line_break');
+  const [isGroupByTimeout, setIsGroupByTimeout] = useState(() => {
+    const saved = localStorage.getItem('is_group_by_timeout');
     return saved ? saved === 'true' : false;
+  });
+  const [groupTimeoutMs, setGroupTimeoutMs] = useState(() => {
+    const saved = localStorage.getItem('group_timeout_ms');
+    return saved ? parseInt(saved, 10) : 100;
   });
   const [isShowTimestamp, setIsShowTimestamp] = useState(() => {
     const saved = localStorage.getItem('is_show_timestamp');
@@ -234,8 +238,12 @@ const App: React.FC = () => {
 
   // 保存终端设置到localStorage
   useEffect(() => {
-    localStorage.setItem('is_auto_line_break', isAutoLineBreak.toString());
-  }, [isAutoLineBreak]);
+    localStorage.setItem('is_group_by_timeout', isGroupByTimeout.toString());
+  }, [isGroupByTimeout]);
+
+  useEffect(() => {
+    localStorage.setItem('group_timeout_ms', groupTimeoutMs.toString());
+  }, [groupTimeoutMs]);
 
   useEffect(() => {
     localStorage.setItem('is_show_timestamp', isShowTimestamp.toString());
@@ -305,6 +313,43 @@ const App: React.FC = () => {
     return logChunks.slice(startIdx).flat();
   }, [logChunks, visibleChunkCount]);
 
+  // 按空闲时间分组：将间隔 <= groupTimeoutMs 的连续数据包合并为一条
+  const displayLogs = useMemo(() => {
+    if (!isGroupByTimeout) return visibleLogs;
+
+    const mergeGroup = (group: LogEntry[]): LogEntry => {
+      if (group.length === 1) return group[0];
+      const first = group[0];
+      const mergedText = group.map(l => l.text).join('');
+      const totalLen = group.reduce((s, l) => s + l.data.length, 0);
+      return { ...first, text: mergedText, data: new Uint8Array(totalLen), byteCount: totalLen };
+    };
+
+    const result: LogEntry[] = [];
+    let group: LogEntry[] = [];
+
+    for (const log of visibleLogs) {
+      if (log.type !== 'rx' && log.type !== 'tx') {
+        if (group.length > 0) { result.push(mergeGroup(group)); group = []; }
+        result.push(log);
+        continue;
+      }
+      if (group.length === 0) {
+        group.push(log);
+      } else {
+        const gap = log.timestamp.getTime() - group[group.length - 1].timestamp.getTime();
+        if (gap <= groupTimeoutMs) {
+          group.push(log);
+        } else {
+          result.push(mergeGroup(group));
+          group = [log];
+        }
+      }
+    }
+    if (group.length > 0) result.push(mergeGroup(group));
+    return result;
+  }, [visibleLogs, isGroupByTimeout, groupTimeoutMs]);
+
   const totalLogCount = useMemo(() => {
     let count = 0;
     for (const chunk of logChunks) count += chunk.length;
@@ -319,7 +364,7 @@ const App: React.FC = () => {
     if (isAutoScroll) {
       terminalEndRef.current?.scrollIntoView({ behavior: 'auto' });
     }
-  }, [visibleLogs, isAutoScroll]);
+  }, [displayLogs, isAutoScroll]);
 
   // 加载更多块（用户上滚时调用）
   const loadMoreChunks = useCallback(() => {
@@ -1102,7 +1147,8 @@ const App: React.FC = () => {
       >
         <Sidebar
           config={config} setConfig={setConfig} isConnected={isConnected}
-          isAutoLineBreak={isAutoLineBreak} setIsAutoLineBreak={setIsAutoLineBreak}
+          isGroupByTimeout={isGroupByTimeout} setIsGroupByTimeout={setIsGroupByTimeout}
+          groupTimeoutMs={groupTimeoutMs} setGroupTimeoutMs={setGroupTimeoutMs}
           isShowTimestamp={isShowTimestamp} setIsShowTimestamp={setIsShowTimestamp}
           isAutoScroll={isAutoScroll} setIsAutoScroll={setIsAutoScroll}
           maxBufferSize={maxBufferSize} setMaxBufferSize={setMaxBufferSize}
@@ -1205,9 +1251,9 @@ const App: React.FC = () => {
         <div className="flex-1 overflow-hidden flex flex-col" style={{ height: `${splitPosition}%` }}>
           <div className="flex-1 overflow-hidden p-2 flex flex-col">
             <Terminal
-              logs={visibleLogs}
+              logs={displayLogs}
               displayMode={displayMode}
-              isAutoLineBreak={isAutoLineBreak}
+              isGroupByTimeout={isGroupByTimeout}
               isShowTimestamp={isShowTimestamp}
               terminalEndRef={terminalEndRef}
               aiAnalysis={null}

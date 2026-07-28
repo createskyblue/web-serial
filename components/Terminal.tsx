@@ -5,7 +5,7 @@ import { uint8ArrayToHex } from '../utils/converters';
 interface TerminalProps {
   logs: LogEntry[];
   displayMode: DisplayMode;
-  isAutoLineBreak: boolean;
+  isGroupByTimeout: boolean;
   isShowTimestamp: boolean;
   terminalEndRef: React.RefObject<HTMLDivElement>;
   aiAnalysis: string | null; // Keep prop for compatibility but don't use
@@ -20,7 +20,7 @@ interface TerminalProps {
 }
 
 const Terminal: React.FC<TerminalProps> = ({
-  logs, displayMode, isAutoLineBreak, isShowTimestamp, terminalEndRef,
+  logs, displayMode, isGroupByTimeout, isShowTimestamp, terminalEndRef,
   lineFrequency, totalRxBytes = 0, totalTxBytes = 0,
   totalLogCount, hasMoreChunks = false, hiddenChunksCount = 0, onLoadMore
 }) => {
@@ -75,7 +75,7 @@ const Terminal: React.FC<TerminalProps> = ({
       {/* Logs Window */}
       <div
         ref={scrollContainerRef}
-        className={`flex-1 p-4 overflow-y-auto custom-scrollbar font-mono text-[13px] bg-slate-50/20 ${!isAutoLineBreak ? 'whitespace-pre-wrap break-all' : ''}`}
+        className={`flex-1 p-4 overflow-y-auto custom-scrollbar font-mono text-[13px] bg-slate-50/20 ${!isGroupByTimeout ? 'whitespace-pre-wrap break-all' : ''}`}
       >
         {/* 哨兵元素 - 检测用户上滚 */}
         <div ref={sentinelRef} className="h-1 w-full" />
@@ -94,7 +94,7 @@ const Terminal: React.FC<TerminalProps> = ({
           </div>
         )}
 
-        {isAutoLineBreak ? (
+        {isGroupByTimeout ? (
           logs.map((log) => (
             <div key={log.id} className="flex px-1 mb-1 hover:bg-gray-100 rounded">
               {isShowTimestamp && (
@@ -174,7 +174,7 @@ const Terminal: React.FC<TerminalProps> = ({
         </div>
         <div className="flex items-center space-x-2">
           <i className={`fas fa-circle text-[6px] ${(totalLogCount ?? logs.length) > 0 ? 'text-green-500' : 'text-gray-300'}`}></i>
-          <span>{isAutoLineBreak ? '分行显示' : '原始流'}{isShowTimestamp ? ' · 时间戳' : ''}</span>
+          <span>{isGroupByTimeout ? '分组显示' : '原始流'}{isShowTimestamp ? ' · 时间戳' : ''}</span>
         </div>
       </div>
     </div>

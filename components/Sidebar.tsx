@@ -19,8 +19,10 @@ interface SidebarProps {
   config: SerialConfig;
   setConfig: React.Dispatch<React.SetStateAction<SerialConfig>>;
   isConnected: boolean;
-  isAutoLineBreak: boolean;
-  setIsAutoLineBreak: (val: boolean) => void;
+  isGroupByTimeout: boolean;
+  setIsGroupByTimeout: (val: boolean) => void;
+  groupTimeoutMs: number;
+  setGroupTimeoutMs: (val: number) => void;
   isShowTimestamp: boolean;
   setIsShowTimestamp: (val: boolean) => void;
   isAutoScroll: boolean;
@@ -115,8 +117,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   config,
   setConfig,
   isConnected,
-  isAutoLineBreak,
-  setIsAutoLineBreak,
+  isGroupByTimeout,
+  setIsGroupByTimeout,
+  groupTimeoutMs,
+  setGroupTimeoutMs,
   isShowTimestamp,
   setIsShowTimestamp,
   isAutoScroll,
@@ -405,12 +409,26 @@ const Sidebar: React.FC<SidebarProps> = ({
               <label className="flex items-center text-xs text-gray-700 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={isAutoLineBreak}
-                  onChange={(e) => setIsAutoLineBreak(e.target.checked)}
+                  checked={isGroupByTimeout}
+                  onChange={(e) => setIsGroupByTimeout(e.target.checked)}
                   className="mr-2 rounded text-blue-600 focus:ring-0"
                 />
-                <span>按数据包强制换行</span>
+                <span>按空闲时间分组</span>
               </label>
+
+              {isGroupByTimeout && (
+                <div className="flex items-center text-xs text-gray-700 pl-5">
+                  <span className="shrink-0">空闲超过</span>
+                  <input
+                    type="number"
+                    value={groupTimeoutMs}
+                    onChange={(e) => setGroupTimeoutMs(Math.max(1, Number(e.target.value)))}
+                    className="w-16 mx-1 px-1 border rounded text-center outline-none focus:ring-1 focus:ring-blue-500 text-xs"
+                    min="1"
+                  />
+                  <span className="shrink-0">ms 则换行</span>
+                </div>
+              )}
 
               <label className="flex items-center text-xs text-gray-700 cursor-pointer">
                 <input
