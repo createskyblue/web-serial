@@ -1173,6 +1173,13 @@ const App: React.FC = () => {
         setVisibleChunkCount(2);
         setTotalRxBytes(0);
         setTotalTxBytes(0);
+      } else if (e.key === 'Tab') {
+        e.preventDefault();
+        setDisplayMode(prev => {
+          const modes = [DisplayMode.Text, DisplayMode.Hex, DisplayMode.SplitView];
+          const idx = modes.indexOf(prev);
+          return modes[(idx + 1) % modes.length];
+        });
       }
     };
 
@@ -1184,7 +1191,7 @@ const App: React.FC = () => {
     <div className="flex h-screen bg-gray-50 overflow-hidden text-gray-800">
       {/* 左侧边栏 */}
       <div
-        className="relative shrink-0 overflow-hidden transition-[width] duration-200 z-20"
+        className="relative shrink-0 overflow-hidden transition-[width] duration-200 z-20 select-none"
         style={{ width: leftSidebarCollapsed ? 36 : leftSidebarWidth }}
       >
         <Sidebar
@@ -1230,12 +1237,12 @@ const App: React.FC = () => {
       </div>
 
       <main className="flex-1 flex flex-col min-w-0 bg-white relative z-10">
-        <header className="bg-white border-b px-6 py-3 flex items-center justify-between shadow-sm">
+        <header className="bg-white border-b px-6 py-3 flex items-center justify-between shadow-sm select-none">
           <div className="flex items-center space-x-4">
           </div>
           
           <div className="flex items-center space-x-3">
-            <div className="bg-gray-100 p-1 rounded-lg flex border border-gray-200">
+            <div className="bg-gray-100 p-1 rounded-lg flex border border-gray-200" title="切换显示模式 ( Tab )">
               <button onClick={() => setDisplayMode(DisplayMode.Text)} className={`px-3 py-1 text-xs rounded-md transition-colors ${displayMode === DisplayMode.Text ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}>文本</button>
               <button onClick={() => setDisplayMode(DisplayMode.Hex)} className={`px-3 py-1 text-xs rounded-md transition-colors ${displayMode === DisplayMode.Hex ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}>HEX</button>
               <button onClick={() => setDisplayMode(DisplayMode.SplitView)} className={`px-3 py-1 text-xs rounded-md transition-colors ${displayMode === DisplayMode.SplitView ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}>同窗</button>
@@ -1316,14 +1323,14 @@ const App: React.FC = () => {
         ></div>
         
 
-        <div className="bg-white shadow-sm m-2 mb-2 transition-all duration-200" style={isSenderCollapsed ? { height: '36px' } : { height: `${100 - splitPosition}%`, minHeight: '80px' }}>
+        <div className="bg-white shadow-sm m-2 mb-2 transition-all duration-200 select-none" style={isSenderCollapsed ? { height: '36px' } : { height: `${100 - splitPosition}%`, minHeight: '80px' }}>
           <Sender onSend={sendData} onFileSend={handleFileSend} isConnected={isConnected && !isPaused} isReconnecting={isReconnecting} isCollapsed={isSenderCollapsed} onToggleCollapse={() => setIsSenderCollapsed(prev => !prev)} />
         </div>
       </main>
 
       {/* 右侧边栏 */}
       <div
-        className="relative shrink-0 overflow-hidden transition-[width] duration-200 z-20"
+        className="relative shrink-0 overflow-hidden transition-[width] duration-200 z-20 select-none"
         style={{ width: rightSidebarCollapsed ? 36 : rightSidebarWidth }}
       >
         {/* 右侧栏拖拽调整大小手柄 */}
