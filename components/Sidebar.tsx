@@ -25,8 +25,6 @@ interface SidebarProps {
   setGroupTimeoutMs: (val: number) => void;
   isShowTimestamp: boolean;
   setIsShowTimestamp: (val: boolean) => void;
-  isAutoScroll: boolean;
-  setIsAutoScroll: (val: boolean) => void;
   maxBufferSize: number;
   setMaxBufferSize: (val: number) => void;
   currentBufferSize: number;
@@ -123,8 +121,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   setGroupTimeoutMs,
   isShowTimestamp,
   setIsShowTimestamp,
-  isAutoScroll,
-  setIsAutoScroll,
   maxBufferSize,
   setMaxBufferSize,
   currentBufferSize,
@@ -432,15 +428,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </div>
               )}
 
-              <label className="flex items-center text-xs text-gray-700 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={isAutoScroll}
-                  onChange={(e) => setIsAutoScroll(e.target.checked)}
-                  className="mr-2 rounded text-blue-600 focus:ring-0"
-                />
-                <span>自动滚动到底部</span>
-              </label>
             </div>
           </div>
 
@@ -460,8 +447,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     max_buffer_size: maxBufferSize,
                     is_group_by_timeout: isGroupByTimeout,
                     group_timeout_ms: groupTimeoutMs,
-                    is_show_timestamp: isShowTimestamp,
-                    is_auto_scroll: isAutoScroll
+                    is_show_timestamp: isShowTimestamp
                   };
                   const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
                   const url = URL.createObjectURL(blob);
@@ -501,7 +487,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                       if (json.is_group_by_timeout !== undefined) setIsGroupByTimeout(json.is_group_by_timeout);
                       if (json.group_timeout_ms) setGroupTimeoutMs(json.group_timeout_ms);
                       if (json.is_show_timestamp !== undefined) setIsShowTimestamp(json.is_show_timestamp);
-                      if (json.is_auto_scroll !== undefined) setIsAutoScroll(json.is_auto_scroll);
                     } catch {
                       alert('无效的配置文件');
                     }

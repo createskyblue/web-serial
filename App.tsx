@@ -85,10 +85,6 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('is_show_timestamp');
     return saved ? saved === 'true' : false;
   });
-  const [isAutoScroll, setIsAutoScroll] = useState(() => {
-    const saved = localStorage.getItem('is_auto_scroll');
-    return saved ? saved === 'true' : true;
-  });
   const [isPaused, setIsPaused] = useState(false); // 新增暂停状态
   const [maxBufferSize, setMaxBufferSize] = useState(() => {
     const saved = localStorage.getItem('max_buffer_size');
@@ -270,10 +266,6 @@ const App: React.FC = () => {
   }, [isShowTimestamp]);
 
   useEffect(() => {
-    localStorage.setItem('is_auto_scroll', isAutoScroll.toString());
-  }, [isAutoScroll]);
-
-  useEffect(() => {
     localStorage.setItem('quick_send_list', JSON.stringify(quickSendItems));
   }, [quickSendItems]);
 
@@ -399,13 +391,6 @@ const App: React.FC = () => {
 
   const hasMoreChunks = visibleChunkCount < logChunks.length;
   const hiddenChunksCount = Math.max(0, logChunks.length - visibleChunkCount);
-
-  // 自动滚动到底部
-  useEffect(() => {
-    if (isAutoScroll) {
-      terminalEndRef.current?.scrollIntoView({ behavior: 'auto' });
-    }
-  }, [displayLogs, isAutoScroll]);
 
   // 加载更多块（用户上滚时调用）
   const loadMoreChunks = useCallback(() => {
@@ -1207,7 +1192,6 @@ const App: React.FC = () => {
           isGroupByTimeout={isGroupByTimeout} setIsGroupByTimeout={setIsGroupByTimeout}
           groupTimeoutMs={groupTimeoutMs} setGroupTimeoutMs={setGroupTimeoutMs}
           isShowTimestamp={isShowTimestamp} setIsShowTimestamp={setIsShowTimestamp}
-          isAutoScroll={isAutoScroll} setIsAutoScroll={setIsAutoScroll}
           maxBufferSize={maxBufferSize} setMaxBufferSize={setMaxBufferSize}
           currentBufferSize={currentBufferSize}
           commMode={commMode} setCommMode={setCommMode}

@@ -176,12 +176,28 @@ const Terminal: React.FC<TerminalProps> = ({
   const sentinelRef = useRef<HTMLDivElement>(null);
   const prevScrollHeightRef = useRef(0);
   const isLoadingMoreRef = useRef(false);
+  const isAtBottomRef = useRef(true); // 用户是否在底部
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // 监听滚动位置，判断用户是否在底部
+  const handleScroll = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const threshold = 50; // 距离底部50px以内视为在底部
+    isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+  }, []);
+
+  // 新数据到达时，仅在用户处于底部时自动滚动
+  useEffect(() => {
+    if (isAtBottomRef.current) {
+      terminalEndRef.current?.scrollIntoView({ behavior: 'auto' });
+    }
+  }, [logs, terminalEndRef]);
 
   const handleLoadMore = useCallback(() => {
     if (!onLoadMore || isLoadingMoreRef.current) return;
@@ -216,6 +232,7 @@ const Terminal: React.FC<TerminalProps> = ({
     <div className="flex-1 bg-white rounded-xl overflow-hidden shadow-sm flex flex-col relative border border-gray-200 h-full">
       <div
         ref={scrollContainerRef}
+        onScroll={handleScroll}
         className={`flex-1 p-4 overflow-y-auto custom-scrollbar font-mono text-[13px] bg-slate-50/20 ${displayMode !== DisplayMode.SplitView ? 'whitespace-pre-wrap break-all' : ''}`}
       >
         <div ref={sentinelRef} className="h-1 w-full" />
