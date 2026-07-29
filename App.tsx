@@ -1262,6 +1262,7 @@ const App: React.FC = () => {
             <Terminal
               logs={displayLogs}
               displayMode={displayMode}
+              isGroupByTimeout={isGroupByTimeout}
               isShowTimestamp={isShowTimestamp}
               terminalEndRef={terminalEndRef}
               aiAnalysis={null}

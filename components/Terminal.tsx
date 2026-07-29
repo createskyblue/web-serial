@@ -5,6 +5,7 @@ import { uint8ArrayToHex } from '../utils/converters';
 interface TerminalProps {
   logs: LogEntry[];
   displayMode: DisplayMode;
+  isGroupByTimeout: boolean;
   isShowTimestamp: boolean;
   terminalEndRef: React.RefObject<HTMLDivElement>;
   aiAnalysis: string | null;
@@ -19,7 +20,7 @@ interface TerminalProps {
 }
 
 const Terminal: React.FC<TerminalProps> = ({
-  logs, displayMode, isShowTimestamp, terminalEndRef,
+  logs, displayMode, isGroupByTimeout, isShowTimestamp, terminalEndRef,
   lineFrequency, totalRxBytes = 0, totalTxBytes = 0,
   totalLogCount, hasMoreChunks = false, hiddenChunksCount = 0, onLoadMore
 }) => {
@@ -105,7 +106,11 @@ const Terminal: React.FC<TerminalProps> = ({
                     [{log.timestamp.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalDigits: 3 } as any)}]
                   </span>
                 )}
-                {displayMode === DisplayMode.Hex ? uint8ArrayToHex(log.data) + ' ' : log.text}
+                {displayMode === DisplayMode.Hex
+                  ? (isGroupByTimeout
+                    ? uint8ArrayToHex(log.data) + '\n'
+                    : uint8ArrayToHex(log.data) + ' ')
+                  : log.text}
               </span>
             );
           })}
