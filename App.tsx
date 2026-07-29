@@ -169,6 +169,10 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('right_sidebar_collapsed');
     return saved ? saved === 'true' : false;
   });
+  const [isSenderCollapsed, setIsSenderCollapsed] = useState(() => {
+    const saved = localStorage.getItem('sender_collapsed');
+    return saved ? saved === 'true' : false;
+  });
   const [isDraggingLeftSidebar, setIsDraggingLeftSidebar] = useState(false);
   const [isDraggingRightSidebar, setIsDraggingRightSidebar] = useState(false);
 
@@ -272,6 +276,10 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('right_sidebar_collapsed', rightSidebarCollapsed.toString());
   }, [rightSidebarCollapsed]);
+
+  useEffect(() => {
+    localStorage.setItem('sender_collapsed', isSenderCollapsed.toString());
+  }, [isSenderCollapsed]);
 
   // 更新频率统计的定时器
   useEffect(() => {
@@ -1140,6 +1148,9 @@ const App: React.FC = () => {
       } else if (e.key === ']') {
         e.preventDefault();
         setRightSidebarCollapsed(prev => !prev);
+      } else if (e.key === "'") {
+        e.preventDefault();
+        setIsSenderCollapsed(prev => !prev);
       }
     };
 
@@ -1200,10 +1211,6 @@ const App: React.FC = () => {
       <main className="flex-1 flex flex-col min-w-0 bg-white relative z-10">
         <header className="bg-white border-b px-6 py-3 flex items-center justify-between shadow-sm">
           <div className="flex items-center space-x-4">
-            <h1 className="text-xl font-bold text-blue-600 flex items-center">
-              <i className="fas fa-microchip mr-2"></i>
-              Web Serial Tool
-            </h1>
           </div>
           
           <div className="flex items-center space-x-3">
@@ -1286,8 +1293,8 @@ const App: React.FC = () => {
         ></div>
         
 
-        <div className="bg-white shadow-sm m-2 mb-2" style={{ height: `${100 - splitPosition}%`, minHeight: '80px' }}>
-          <Sender onSend={sendData} onFileSend={handleFileSend} isConnected={isConnected && !isPaused} isReconnecting={isReconnecting} />
+        <div className="bg-white shadow-sm m-2 mb-2 transition-all duration-200" style={isSenderCollapsed ? { height: '36px' } : { height: `${100 - splitPosition}%`, minHeight: '80px' }}>
+          <Sender onSend={sendData} onFileSend={handleFileSend} isConnected={isConnected && !isPaused} isReconnecting={isReconnecting} isCollapsed={isSenderCollapsed} onToggleCollapse={() => setIsSenderCollapsed(prev => !prev)} />
         </div>
       </main>
 

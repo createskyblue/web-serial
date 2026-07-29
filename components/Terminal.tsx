@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { LogEntry, DisplayMode } from '../types';
 import { uint8ArrayToHex } from '../utils/converters';
 
@@ -28,6 +28,12 @@ const Terminal: React.FC<TerminalProps> = ({
   const sentinelRef = useRef<HTMLDivElement>(null);
   const prevScrollHeightRef = useRef(0);
   const isLoadingMoreRef = useRef(false);
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const handleLoadMore = useCallback(() => {
     if (!onLoadMore || isLoadingMoreRef.current) return;
@@ -194,9 +200,9 @@ const Terminal: React.FC<TerminalProps> = ({
           <span className="text-blue-600">发送: {totalTxBytes} 字节</span>
           <span className="text-purple-600">换行频率: {lineFrequency !== undefined ? `${lineFrequency} 行/秒` : '0 行/秒'}</span>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 text-green-600">
           <i className={`fas fa-circle text-[6px] ${(totalLogCount ?? logs.length) > 0 ? 'text-green-500' : 'text-gray-300'}`}></i>
-          <span>{isShowTimestamp ? '时间戳' : '原始流'}</span>
+          <span>{now.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
         </div>
       </div>
     </div>

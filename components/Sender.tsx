@@ -8,9 +8,11 @@ interface SenderProps {
   onFileSend: (file: File, options: { mode: FileSendMode, throttleBytes: number, throttleMs: number, onProgress: (p: number) => void }) => Promise<void>;
   isConnected: boolean;
   isReconnecting?: boolean;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-const Sender: React.FC<SenderProps> = ({ onSend, onFileSend, isConnected, isReconnecting = false }) => {
+const Sender: React.FC<SenderProps> = ({ onSend, onFileSend, isConnected, isReconnecting = false, isCollapsed = false, onToggleCollapse }) => {
   const [mode, setMode] = useState<DisplayMode>(DisplayMode.Text);
   const [input, setInput] = useState(() => {
     const saved = localStorage.getItem('serial-input');
@@ -62,6 +64,28 @@ const Sender: React.FC<SenderProps> = ({ onSend, onFileSend, isConnected, isReco
   useEffect(() => {
     localStorage.setItem('file_transfer_collapsed', isFileTransferCollapsed.toString());
   }, [isFileTransferCollapsed]);
+
+  // 全局 Ctrl+Enter 发送快捷键
+  const inputRef = useRef(input);
+  inputRef.current = input;
+  const addNewlineRef = useRef(addNewline);
+  addNewlineRef.current = addNewline;
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        const val = inputRef.current;
+        if (!val.trim()) return;
+        const dataToSend = addNewlineRef.current ? val + '\r\n' : val;
+        onSend(dataToSend, modeRef.current);
+      }
+    };
+    document.addEventListener('keydown', handleGlobalKeyDown);
+    return () => document.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [onSend]);
 
   // 定时发送逻辑
   useEffect(() => {
@@ -147,15 +171,50 @@ const Sender: React.FC<SenderProps> = ({ onSend, onFileSend, isConnected, isReco
 
   return (
     <div className="h-full flex flex-col min-h-0">
-      <div className="flex gap-4 flex-1 min-h-0">
-        {/* 左侧：普通发送区 */}
-        <div className="flex-1 flex flex-col min-h-0">
+      {isCollapsed ? (
+        /* 折叠态：展开按钮 + 输入框 + 发送按钮 */
+        <div className="h-full flex items-center gap-2 px-2">
+          <button
+            onClick={onToggleCollapse}
+            className="text-xs text-gray-400 hover:text-blue-600 transition-colors shrink-0"
+            title="展开发送区 ( ' )"
+          >
+            <i className="fas fa-chevron-up"></i>
+          </button>
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={mode === DisplayMode.Hex ? "输入 Hex (如 01 02 FF)" : "输入文本..."}
+            className="flex-1 h-7 px-2 bg-gray-50 border border-gray-300 rounded text-xs font-mono focus:ring-2 focus:ring-blue-500 outline-none"
+          />
+          <button
+            onClick={handleSendClick}
+            disabled={!isConnected || !input.trim()}
+            className="h-7 px-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded disabled:opacity-30 transition-all shrink-0 text-[11px] flex items-center gap-1"
+          >
+            <i className="fas fa-paper-plane text-[10px]"></i>发送 Ctrl+Enter
+          </button>
+        </div>
+      ) : (
+        <div className="flex gap-4 flex-1 min-h-0">
+          {/* 左侧：普通发送区 */}
+          <div className="flex-1 flex flex-col min-h-0">
           <div className="flex items-center justify-between mb-2 shrink-0">
-            <div className="flex space-x-2 bg-gray-100 p-0.5 rounded-md">
-              <button onClick={() => handleModeChange(DisplayMode.Text)} className={`text-[10px] px-2 py-1 rounded transition-colors ${mode === DisplayMode.Text ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}>文本模式</button>
-              <button onClick={() => handleModeChange(DisplayMode.Hex)} className={`text-[10px] px-2 py-1 rounded transition-colors ${mode === DisplayMode.Hex ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}>Hex 模式</button>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={onToggleCollapse}
+                className="text-xs text-gray-400 hover:text-blue-600 transition-colors"
+                title="折叠发送区 ( ' )"
+              >
+                <i className="fas fa-chevron-down"></i>
+              </button>
+              <div className="flex space-x-2 bg-gray-100 p-0.5 rounded-md">
+                <button onClick={() => handleModeChange(DisplayMode.Text)} className={`text-[10px] px-2 py-1 rounded transition-colors ${mode === DisplayMode.Text ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}>文本模式</button>
+                <button onClick={() => handleModeChange(DisplayMode.Hex)} className={`text-[10px] px-2 py-1 rounded transition-colors ${mode === DisplayMode.Hex ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}>Hex 模式</button>
+              </div>
             </div>
-            
+
             <div className="flex items-center space-x-3 text-[11px]">
               <label className="flex items-center cursor-pointer text-gray-600">
                 <input type="checkbox" checked={addNewline} onChange={e => setAddNewline(e.target.checked)} className="mr-1 rounded text-blue-600" />
@@ -164,9 +223,9 @@ const Sender: React.FC<SenderProps> = ({ onSend, onFileSend, isConnected, isReco
               <div className="flex items-center text-gray-600">
                 <input type="checkbox" checked={isTimerEnabled} onChange={e => setIsTimerEnabled(e.target.checked)} className="mr-1 rounded text-blue-600" />
                 定时发送
-                <input 
+                <input
                   type="number" value={timerInterval} onChange={e => setTimerInterval(Number(e.target.value))}
-                  className="w-16 mx-1 px-1 border rounded text-center outline-none focus:ring-1 focus:ring-blue-500" 
+                  className="w-16 mx-1 px-1 border rounded text-center outline-none focus:ring-1 focus:ring-blue-500"
                   disabled={isTimerEnabled}
                 />
                 ms
@@ -175,7 +234,7 @@ const Sender: React.FC<SenderProps> = ({ onSend, onFileSend, isConnected, isReco
           </div>
 
           <div className="flex flex-col gap-2 flex-1 min-h-0">
-            <textarea 
+            <textarea
               value={input} onChange={(e) => setInput(e.target.value)}
               placeholder={mode === DisplayMode.Hex ? "输入 Hex (如 01 02 FF)" : "输入文本内容..."}
               className="flex-1 min-h-0 p-2 bg-gray-50 border border-gray-300 rounded-lg text-xs font-mono focus:ring-2 focus:ring-blue-500 outline-none resize-none"
@@ -185,7 +244,7 @@ const Sender: React.FC<SenderProps> = ({ onSend, onFileSend, isConnected, isReco
               className="h-10 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg disabled:opacity-30 shadow-sm transition-all flex flex-row items-center justify-center shrink-0"
             >
               <i className="fas fa-paper-plane text-sm mb-1"></i>
-              <span className="text-[11px] ms-2">发送</span>
+              <span className="text-[11px] ms-2">发送 <span className="opacity-60">Ctrl+Enter</span></span>
             </button>
           </div>
         </div>
@@ -281,6 +340,7 @@ const Sender: React.FC<SenderProps> = ({ onSend, onFileSend, isConnected, isReco
           )}
         </div>
       </div>
+      )}
     </div>
   );
 };

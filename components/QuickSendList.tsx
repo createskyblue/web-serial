@@ -70,7 +70,7 @@ const QuickSendList: React.FC<QuickSendListProps> = ({ items, onSend, onUpdate, 
           <button
             onClick={onToggleCollapse}
             className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-            title="展开侧边栏 (])"
+            title="展开侧边栏 ( ] )"
           >
             <i className="fas fa-chevron-left text-sm"></i>
           </button>
@@ -78,23 +78,25 @@ const QuickSendList: React.FC<QuickSendListProps> = ({ items, onSend, onUpdate, 
       ) : (
         <>
       <div className="p-4 border-b bg-gray-50/50 flex items-center justify-between">
-        <h2 className="text-sm font-bold text-gray-700 flex items-center">
-          <i className="fas fa-bolt mr-2 text-yellow-500"></i>
-          快捷发送
-        </h2>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onToggleCollapse}
+            className="p-1.5 text-xs text-gray-400 hover:text-blue-600 hover:bg-white rounded transition-colors"
+            title="折叠侧边栏 ( ] )"
+          >
+            <i className="fas fa-chevron-right text-sm"></i>
+          </button>
+          <h2 className="text-sm font-bold text-gray-700 flex items-center">
+            <i className="fas fa-bolt mr-2 text-yellow-500"></i>
+            快捷发送
+          </h2>
+        </div>
         <div className="flex space-x-1">
           <button onClick={() => fileInputRef.current?.click()} className="p-1.5 text-xs text-gray-500 hover:text-blue-600 hover:bg-white rounded transition-colors" title="导入">
             <i className="fas fa-file-import"></i>
           </button>
           <button onClick={exportData} className="p-1.5 text-xs text-gray-500 hover:text-blue-600 hover:bg-white rounded transition-colors" title="导出">
             <i className="fas fa-file-export"></i>
-          </button>
-          <button
-            onClick={onToggleCollapse}
-            className="p-1.5 text-xs text-gray-400 hover:text-blue-600 hover:bg-white rounded transition-colors"
-            title="折叠侧边栏 (])"
-          >
-            <i className="fas fa-chevron-right text-sm"></i>
           </button>
           <input type="file" ref={fileInputRef} onChange={handleImport} className="hidden" accept=".json" />
         </div>

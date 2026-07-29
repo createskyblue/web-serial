@@ -224,7 +224,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={onToggleCollapse}
             className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-            title="展开侧边栏 ([)"
+            title="展开侧边栏 ( [ )"
           >
             <i className="fas fa-chevron-right text-sm"></i>
           </button>
@@ -240,7 +240,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={onToggleCollapse}
             className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-            title="折叠侧边栏 ([)"
+            title="折叠侧边栏 ( [ )"
           >
             <i className="fas fa-chevron-left text-sm"></i>
           </button>
