@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { LogEntry, DisplayMode, ColorRule } from '../types';
-import { uint8ArrayToHex, hexToUint8Array, uint8ArrayToString } from '../utils/converters';
+import { hexToUint8Array, uint8ArrayToString } from '../utils/converters';
 
 interface ColorSegment {
   text: string;
@@ -117,6 +117,27 @@ function highlightText(text: string, data: Uint8Array, rules: ColorRule[]): Colo
     segments.push({ text: text.slice(pos) });
   }
   return segments;
+}
+
+/** HEX 转换并在 \r \n \r\n 处换行 */
+function bytesToHexWithBreaks(bytes: Uint8Array): string {
+  let result = '';
+  for (let i = 0; i < bytes.length; i++) {
+    const b = bytes[i];
+    result += b.toString(16).padStart(2, '0').toUpperCase();
+    if (b === 0x0D) {
+      if (i + 1 < bytes.length && bytes[i + 1] === 0x0A) {
+        result += ' '; // \r\n 中的 \r 不加换行，留给 \n 处理
+      } else {
+        result += '\n'; // 独立 \r
+      }
+    } else if (b === 0x0A) {
+      result += '\n'; // \n 或 \r\n 中的 \n
+    } else {
+      result += ' ';
+    }
+  }
+  return result;
 }
 
 interface TerminalProps {
@@ -264,8 +285,6 @@ const Terminal: React.FC<TerminalProps> = ({
                 const secondChanged = prevLog && !prevIsSystem &&
                   Math.floor(log.timestamp.getTime() / 1000) !== Math.floor(prevLog.timestamp.getTime() / 1000);
                 const showTs = isShowTimestamp && (isFirst || prevEndsNewline || secondChanged);
-                const newlineCount = (log.text.match(/\n/g) || []).length;
-                const suffix = newlineCount > 0 ? '\n'.repeat(newlineCount) : ' ';
                 return (
                   <span key={log.id} className={log.type === 'tx' ? 'text-blue-600' : 'text-slate-800'}>
                     {showTs && (
@@ -276,10 +295,9 @@ const Terminal: React.FC<TerminalProps> = ({
                     {segments.map((seg, si) => {
                       const bytes = new TextEncoder().encode(seg.text);
                       return (
-                        <span key={si} style={seg.color ? { color: seg.color } : undefined}>{uint8ArrayToHex(bytes)}</span>
+                        <span key={si} style={seg.color ? { color: seg.color } : undefined}>{bytesToHexWithBreaks(bytes)}</span>
                       );
                     })}
-                    {suffix}
                   </span>
                 );
               })}
@@ -317,9 +335,9 @@ const Terminal: React.FC<TerminalProps> = ({
                     ? segments.map((seg, si) => {
                         const bytes = new TextEncoder().encode(seg.text);
                         return (
-                          <span key={si} style={seg.color ? { color: seg.color } : undefined}>{uint8ArrayToHex(bytes)}</span>
+                          <span key={si} style={seg.color ? { color: seg.color } : undefined}>{bytesToHexWithBreaks(bytes)}</span>
                         );
-                      }).concat([<span key="suffix">{isGroupByTimeout ? '\n' : ' '}</span>])
+                      })
                     : segments.map((seg, si) => (
                       <span key={si} style={seg.color ? { color: seg.color } : undefined}>{seg.text}</span>
                     ))}

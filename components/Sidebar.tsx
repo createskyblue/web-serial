@@ -457,7 +457,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 重新选择串口
               </button>
             )}
-            <button onClick={onConnect} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition-colors flex items-center justify-center">
+            <button onClick={onConnect} title="快捷键 ( p )" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition-colors flex items-center justify-center">
               {commMode === CommMode.WebSocket ? (
                 <i className="fas fa-globe mr-2"></i>
               ) : commMode === CommMode.Bluetooth ? (
@@ -469,7 +469,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </>
         ) : (
-          <button onClick={onDisconnect} className={`w-full ${isReconnecting ? 'bg-orange-500 hover:bg-orange-600' : 'bg-red-500 hover:bg-red-600'} text-white font-bold py-3 px-4 rounded-lg shadow-md transition-colors flex items-center justify-center`}>
+          <button onClick={onDisconnect} title="快捷键 ( p )" className={`w-full ${isReconnecting ? 'bg-orange-500 hover:bg-orange-600' : 'bg-red-500 hover:bg-red-600'} text-white font-bold py-3 px-4 rounded-lg shadow-md transition-colors flex items-center justify-center`}>
             <i className={`fas ${isReconnecting ? 'fa-spinner fa-spin' : 'fa-power-off'} mr-2`}></i>
             {commMode === CommMode.WebSocket ? (isReconnecting ? '放弃重连' : '断开 WebSocket') : commMode === CommMode.Bluetooth ? '断开蓝牙' : '关闭串口'}
           </button>

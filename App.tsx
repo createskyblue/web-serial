@@ -1164,12 +1164,25 @@ const App: React.FC = () => {
       } else if (e.key === "'") {
         e.preventDefault();
         setIsSenderCollapsed(prev => !prev);
+      } else if (e.key === 'p') {
+        e.preventDefault();
+        if (isConnected) {
+          disconnect();
+        } else {
+          connect();
+        }
+      } else if (e.key === 'c') {
+        e.preventDefault();
+        setLogChunks([[]]);
+        setVisibleChunkCount(2);
+        setTotalRxBytes(0);
+        setTotalTxBytes(0);
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isConnected, connect, disconnect]);
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden text-gray-800">
@@ -1259,7 +1272,7 @@ const App: React.FC = () => {
                 setTotalTxBytes(0);
               }}
               className="px-4 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-md text-xs transition-colors shadow-sm"
-              title="清空屏幕和统计数据"
+              title="清空屏幕 ( c )"
             >
               清屏
             </button>
