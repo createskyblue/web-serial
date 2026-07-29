@@ -7,6 +7,7 @@ import {
   DisplayMode,
   LogEntry,
   QuickSendItem,
+  ColorRule,
   FileSendMode,
   CommMode
 } from './types';
@@ -47,6 +48,7 @@ import Sidebar from './components/Sidebar';
 import Terminal from './components/Terminal';
 import Sender from './components/Sender';
 import QuickSendList from './components/QuickSendList';
+import ColorRuleList from './components/ColorRuleList';
 
 interface SerialPort {
   readonly readable: ReadableStream<Uint8Array> | null;
@@ -175,6 +177,13 @@ const App: React.FC = () => {
   });
   const [isDraggingLeftSidebar, setIsDraggingLeftSidebar] = useState(false);
   const [isDraggingRightSidebar, setIsDraggingRightSidebar] = useState(false);
+  const [rightSidebarTab, setRightSidebarTab] = useState<'quick' | 'color'>('quick');
+
+  const [colorRules, setColorRules] = useState<ColorRule[]>(() => {
+    const saved = localStorage.getItem('color_rules');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [colorVersion, setColorVersion] = useState(0);
 
   const [quickSendItems, setQuickSendItems] = useState<QuickSendItem[]>(() => {
     const saved = localStorage.getItem('quick_send_list');
@@ -280,6 +289,10 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('sender_collapsed', isSenderCollapsed.toString());
   }, [isSenderCollapsed]);
+
+  useEffect(() => {
+    localStorage.setItem('color_rules', JSON.stringify(colorRules));
+  }, [colorRules]);
 
   // 更新频率统计的定时器
   useEffect(() => {
@@ -1282,6 +1295,8 @@ const App: React.FC = () => {
               hasMoreChunks={hasMoreChunks}
               hiddenChunksCount={hiddenChunksCount}
               onLoadMore={loadMoreChunks}
+              colorRules={colorRules}
+              colorVersion={colorVersion}
             />
           </div>
         </div>
@@ -1315,12 +1330,50 @@ const App: React.FC = () => {
             }}
           />
         )}
-        <QuickSendList
-          items={quickSendItems} onUpdate={setQuickSendItems} onSend={sendData}
-          isConnected={isConnected && !isPaused} isReconnecting={isReconnecting}
-          isCollapsed={rightSidebarCollapsed}
-          onToggleCollapse={() => setRightSidebarCollapsed(prev => !prev)}
-        />
+        {rightSidebarCollapsed ? (
+          <div className="flex flex-col items-center py-4 h-full bg-white border-l">
+            <button
+              onClick={() => setRightSidebarCollapsed(false)}
+              className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+              title="展开侧边栏 ( ] )"
+            >
+              <i className="fas fa-chevron-left text-sm"></i>
+            </button>
+          </div>
+        ) : (
+          <aside className="w-full bg-white border-l flex flex-col h-full shadow-sm z-20">
+            <div className="p-4 border-b bg-gray-50/50 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setRightSidebarCollapsed(true)}
+                  className="p-1.5 text-xs text-gray-400 hover:text-blue-600 hover:bg-white rounded transition-colors"
+                  title="折叠侧边栏 ( ] )"
+                >
+                  <i className="fas fa-chevron-right text-sm"></i>
+                </button>
+                <div className="flex bg-gray-200 p-0.5 rounded-md">
+                  <button onClick={() => setRightSidebarTab('quick')} className={`text-[10px] px-2 py-1 rounded transition-colors ${rightSidebarTab === 'quick' ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}>快捷发送</button>
+                  <button onClick={() => setRightSidebarTab('color')} className={`text-[10px] px-2 py-1 rounded transition-colors ${rightSidebarTab === 'color' ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}>染色</button>
+                </div>
+              </div>
+            </div>
+            {rightSidebarTab === 'quick' ? (
+              <QuickSendList
+                items={quickSendItems} onUpdate={setQuickSendItems} onSend={sendData}
+                isConnected={isConnected && !isPaused} isReconnecting={isReconnecting}
+                isCollapsed={false}
+                onToggleCollapse={() => {}}
+                hideHeader
+              />
+            ) : (
+              <ColorRuleList
+                rules={colorRules}
+                onUpdate={setColorRules}
+                onRefreshAll={() => setColorVersion(v => v + 1)}
+              />
+            )}
+          </aside>
+        )}
       </div>
     </div>
   );

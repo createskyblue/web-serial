@@ -1,6 +1,123 @@
-import React, { useEffect, useRef, useCallback, useState } from 'react';
-import { LogEntry, DisplayMode } from '../types';
-import { uint8ArrayToHex } from '../utils/converters';
+import React, { useEffect, useRef, useCallback, useState, useMemo } from 'react';
+import { LogEntry, DisplayMode, ColorRule } from '../types';
+import { uint8ArrayToHex, hexToUint8Array, uint8ArrayToString } from '../utils/converters';
+
+interface ColorSegment {
+  text: string;
+  color?: string;
+}
+
+function highlightText(text: string, data: Uint8Array, rules: ColorRule[]): ColorSegment[] {
+  if (!rules.length) return [{ text }];
+
+  // 收集所有匹配区间
+  interface Interval {
+    start: number;
+    end: number;
+    color: string;
+    priority: number;
+  }
+  const intervals: Interval[] = [];
+
+  for (let ri = 0; ri < rules.length; ri++) {
+    const rule = rules[ri];
+
+    // 将 key 转换为可搜索的文本（Hex 模式先转换）
+    const keyToText = (key: string, mode: DisplayMode): string => {
+      if (!key) return '';
+      if (mode === DisplayMode.Hex) {
+        try {
+          const bytes = hexToUint8Array(key);
+          return uint8ArrayToString(bytes);
+        } catch { return ''; }
+      }
+      return key;
+    };
+
+    const leftText = keyToText(rule.leftKey, rule.leftKeyMode);
+    const contentText = keyToText(rule.content, rule.contentMode);
+    const rightText = keyToText(rule.rightKey, rule.rightKeyMode);
+
+    // 区间模式：left + right 均非空
+    if (leftText && rightText) {
+      let searchFrom = 0;
+      while (searchFrom < text.length) {
+        const leftIdx = text.indexOf(leftText, searchFrom);
+        if (leftIdx === -1) break;
+        const rightIdx = text.indexOf(rightText, leftIdx + leftText.length);
+        if (rightIdx === -1) break;
+        intervals.push({
+          start: leftIdx,
+          end: rightIdx + rightText.length,
+          color: rule.color,
+          priority: ri
+        });
+        searchFrom = rightIdx + rightText.length;
+      }
+    }
+
+    // 关键字模式：仅 content 非空
+    if (contentText) {
+      let searchFrom = 0;
+      while (searchFrom < text.length) {
+        const idx = text.indexOf(contentText, searchFrom);
+        if (idx === -1) break;
+        intervals.push({
+          start: idx,
+          end: idx + contentText.length,
+          color: rule.color,
+          priority: ri
+        });
+        searchFrom = idx + 1;
+      }
+    }
+  }
+
+  if (!intervals.length) return [{ text }];
+
+  // 按 start 排序，同 start 时高 priority 排后（后覆盖前）
+  intervals.sort((a, b) => a.start - b.start || a.priority - b.priority);
+
+  // 合并重叠区间（后定义的规则覆盖前面的）
+  const merged: Interval[] = [];
+  for (const iv of intervals) {
+    if (merged.length === 0) {
+      merged.push({ ...iv });
+      continue;
+    }
+    const last = merged[merged.length - 1];
+    if (iv.start < last.end) {
+      // 重叠：高 priority 覆盖
+      if (iv.priority >= last.priority) {
+        // 当前规则替换重叠部分
+        if (iv.start > last.start) {
+          last.end = iv.start; // 截断前一段
+        } else {
+          merged.pop(); // 完全覆盖
+        }
+        merged.push({ ...iv });
+      }
+      // 低 priority 忽略重叠部分
+    } else {
+      merged.push({ ...iv });
+    }
+  }
+
+  // 切分文本为片段
+  const segments: ColorSegment[] = [];
+  let pos = 0;
+  for (const iv of merged) {
+    if (iv.start > pos) {
+      segments.push({ text: text.slice(pos, iv.start) });
+    }
+    segments.push({ text: text.slice(iv.start, iv.end), color: iv.color });
+    pos = iv.end;
+  }
+  if (pos < text.length) {
+    segments.push({ text: text.slice(pos) });
+  }
+  return segments;
+}
 
 interface TerminalProps {
   logs: LogEntry[];
@@ -17,13 +134,23 @@ interface TerminalProps {
   hasMoreChunks?: boolean;
   hiddenChunksCount?: number;
   onLoadMore?: () => void;
+  colorRules?: ColorRule[];
+  colorVersion?: number;
 }
 
 const Terminal: React.FC<TerminalProps> = ({
   logs, displayMode, isGroupByTimeout, isShowTimestamp, terminalEndRef,
   lineFrequency, totalRxBytes = 0, totalTxBytes = 0,
-  totalLogCount, hasMoreChunks = false, hiddenChunksCount = 0, onLoadMore
+  totalLogCount, hasMoreChunks = false, hiddenChunksCount = 0, onLoadMore,
+  colorRules = [], colorVersion = 0
 }) => {
+  // 染色缓存
+  const coloredLogs = useMemo(() => {
+    return logs.map(log => ({
+      log,
+      segments: colorRules.length > 0 ? highlightText(log.text, log.data, colorRules) : [{ text: log.text } as ColorSegment]
+    }));
+  }, [logs, colorRules, colorVersion]);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const prevScrollHeightRef = useRef(0);
@@ -89,7 +216,7 @@ const Terminal: React.FC<TerminalProps> = ({
           <div className="flex">
             {/* 左侧：文本列 */}
             <div className="flex-1 overflow-x-auto whitespace-pre border-r border-gray-300 pr-3 min-w-0">
-              {logs.map((log, idx) => {
+              {coloredLogs.map(({ log, segments }, idx) => {
                 const isSystem = log.type !== 'rx' && log.type !== 'tx';
                 if (isSystem) {
                   return (
@@ -99,7 +226,7 @@ const Terminal: React.FC<TerminalProps> = ({
                   );
                 }
                 const isFirst = idx === 0;
-                const prevLog = idx > 0 ? logs[idx - 1] : null;
+                const prevLog = idx > 0 ? coloredLogs[idx - 1].log : null;
                 const prevIsSystem = prevLog && prevLog.type !== 'rx' && prevLog.type !== 'tx';
                 const prevEndsNewline = prevLog && !prevIsSystem && prevLog.text.endsWith('\n');
                 const secondChanged = prevLog && !prevIsSystem &&
@@ -112,14 +239,16 @@ const Terminal: React.FC<TerminalProps> = ({
                         [{log.timestamp.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalDigits: 3 } as any)}]
                       </span>
                     )}
-                    {log.text}
+                    {segments.map((seg, si) => (
+                      <span key={si} style={seg.color ? { color: seg.color } : undefined}>{seg.text}</span>
+                    ))}
                   </span>
                 );
               })}
             </div>
             {/* 右侧：HEX 列 */}
             <div className="flex-1 overflow-x-auto whitespace-pre pl-3 min-w-0">
-              {logs.map((log, idx) => {
+              {coloredLogs.map(({ log, segments }, idx) => {
                 const isSystem = log.type !== 'rx' && log.type !== 'tx';
                 if (isSystem) {
                   return (
@@ -129,12 +258,14 @@ const Terminal: React.FC<TerminalProps> = ({
                   );
                 }
                 const isFirst = idx === 0;
-                const prevLog = idx > 0 ? logs[idx - 1] : null;
+                const prevLog = idx > 0 ? coloredLogs[idx - 1].log : null;
                 const prevIsSystem = prevLog && prevLog.type !== 'rx' && prevLog.type !== 'tx';
                 const prevEndsNewline = prevLog && !prevIsSystem && prevLog.text.endsWith('\n');
                 const secondChanged = prevLog && !prevIsSystem &&
                   Math.floor(log.timestamp.getTime() / 1000) !== Math.floor(prevLog.timestamp.getTime() / 1000);
                 const showTs = isShowTimestamp && (isFirst || prevEndsNewline || secondChanged);
+                const newlineCount = (log.text.match(/\n/g) || []).length;
+                const suffix = newlineCount > 0 ? '\n'.repeat(newlineCount) : ' ';
                 return (
                   <span key={log.id} className={log.type === 'tx' ? 'text-blue-600' : 'text-slate-800'}>
                     {showTs && (
@@ -142,11 +273,13 @@ const Terminal: React.FC<TerminalProps> = ({
                         [{log.timestamp.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalDigits: 3 } as any)}]
                       </span>
                     )}
-                    {(() => {
-                      const newlineCount = (log.text.match(/\n/g) || []).length;
-                      const suffix = newlineCount > 0 ? '\n'.repeat(newlineCount) : ' ';
-                      return uint8ArrayToHex(log.data) + suffix;
-                    })()}
+                    {segments.map((seg, si) => {
+                      const bytes = new TextEncoder().encode(seg.text);
+                      return (
+                        <span key={si} style={seg.color ? { color: seg.color } : undefined}>{uint8ArrayToHex(bytes)}</span>
+                      );
+                    })}
+                    {suffix}
                   </span>
                 );
               })}
@@ -154,7 +287,7 @@ const Terminal: React.FC<TerminalProps> = ({
           </div>
         ) : (
           <div className="inline">
-            {logs.map((log, idx) => {
+            {coloredLogs.map(({ log, segments }, idx) => {
               const isSystem = log.type !== 'rx' && log.type !== 'tx';
               if (isSystem) {
                 return (
@@ -166,7 +299,7 @@ const Terminal: React.FC<TerminalProps> = ({
 
               // 时间戳：仅在第一条、上条以 \n 结尾、或秒数变化时显示
               const isFirst = idx === 0;
-              const prevLog = idx > 0 ? logs[idx - 1] : null;
+              const prevLog = idx > 0 ? coloredLogs[idx - 1].log : null;
               const prevIsSystem = prevLog && prevLog.type !== 'rx' && prevLog.type !== 'tx';
               const prevEndsNewline = prevLog && !prevIsSystem && prevLog.text.endsWith('\n');
               const secondChanged = prevLog && !prevIsSystem &&
@@ -181,10 +314,15 @@ const Terminal: React.FC<TerminalProps> = ({
                     </span>
                   )}
                   {displayMode === DisplayMode.Hex
-                    ? (isGroupByTimeout
-                      ? uint8ArrayToHex(log.data) + '\n'
-                      : uint8ArrayToHex(log.data) + ' ')
-                    : log.text}
+                    ? segments.map((seg, si) => {
+                        const bytes = new TextEncoder().encode(seg.text);
+                        return (
+                          <span key={si} style={seg.color ? { color: seg.color } : undefined}>{uint8ArrayToHex(bytes)}</span>
+                        );
+                      }).concat([<span key="suffix">{isGroupByTimeout ? '\n' : ' '}</span>])
+                    : segments.map((seg, si) => (
+                      <span key={si} style={seg.color ? { color: seg.color } : undefined}>{seg.text}</span>
+                    ))}
                 </span>
               );
             })}

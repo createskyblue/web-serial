@@ -62,3 +62,14 @@ export interface QuickSendItem {
   content: string;
   mode: DisplayMode;
 }
+
+export interface ColorRule {
+  id: string;
+  color: string;
+  leftKey: string;
+  leftKeyMode: DisplayMode;
+  content: string;
+  contentMode: DisplayMode;
+  rightKey: string;
+  rightKeyMode: DisplayMode;
+}

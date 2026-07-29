@@ -10,9 +10,10 @@ interface QuickSendListProps {
   isReconnecting?: boolean;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  hideHeader?: boolean;
 }
 
-const QuickSendList: React.FC<QuickSendListProps> = ({ items, onSend, onUpdate, isConnected, isReconnecting = false, isCollapsed, onToggleCollapse }) => {
+const QuickSendList: React.FC<QuickSendListProps> = ({ items, onSend, onUpdate, isConnected, isReconnecting = false, isCollapsed, onToggleCollapse, hideHeader = false }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addItem = () => {
@@ -77,6 +78,7 @@ const QuickSendList: React.FC<QuickSendListProps> = ({ items, onSend, onUpdate, 
         </div>
       ) : (
         <>
+      {!hideHeader && (
       <div className="p-4 border-b bg-gray-50/50 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button
@@ -101,6 +103,7 @@ const QuickSendList: React.FC<QuickSendListProps> = ({ items, onSend, onUpdate, 
           <input type="file" ref={fileInputRef} onChange={handleImport} className="hidden" accept=".json" />
         </div>
       </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
         {items.length === 0 && (
