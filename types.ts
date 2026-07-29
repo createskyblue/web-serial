@@ -73,3 +73,12 @@ export interface ColorRule {
   rightKey: string;
   rightKeyMode: DisplayMode;
 }
+
+export interface ExtractRule {
+  id: string;
+  leftKey: string;
+  leftKeyMode: DisplayMode;
+  rightKey: string;
+  rightKeyMode: DisplayMode;
+  displayMode: DisplayMode;
+}

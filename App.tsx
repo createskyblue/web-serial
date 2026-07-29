@@ -8,6 +8,7 @@ import {
   LogEntry,
   QuickSendItem,
   ColorRule,
+  ExtractRule,
   FileSendMode,
   CommMode
 } from './types';
@@ -49,6 +50,7 @@ import Terminal from './components/Terminal';
 import Sender from './components/Sender';
 import QuickSendList from './components/QuickSendList';
 import ColorRuleList from './components/ColorRuleList';
+import ExtractRuleList from './components/ExtractRuleList';
 
 interface SerialPort {
   readonly readable: ReadableStream<Uint8Array> | null;
@@ -177,13 +179,18 @@ const App: React.FC = () => {
   });
   const [isDraggingLeftSidebar, setIsDraggingLeftSidebar] = useState(false);
   const [isDraggingRightSidebar, setIsDraggingRightSidebar] = useState(false);
-  const [rightSidebarTab, setRightSidebarTab] = useState<'quick' | 'color'>('quick');
+  const [rightSidebarTab, setRightSidebarTab] = useState<'quick' | 'color' | 'extract'>('quick');
 
   const [colorRules, setColorRules] = useState<ColorRule[]>(() => {
     const saved = localStorage.getItem('color_rules');
     return saved ? JSON.parse(saved) : [];
   });
   const [colorVersion, setColorVersion] = useState(0);
+
+  const [extractRules, setExtractRules] = useState<ExtractRule[]>(() => {
+    const saved = localStorage.getItem('extract_rules');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   const [quickSendItems, setQuickSendItems] = useState<QuickSendItem[]>(() => {
     const saved = localStorage.getItem('quick_send_list');
@@ -293,6 +300,10 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('color_rules', JSON.stringify(colorRules));
   }, [colorRules]);
+
+  useEffect(() => {
+    localStorage.setItem('extract_rules', JSON.stringify(extractRules));
+  }, [extractRules]);
 
   // 更新频率统计的定时器
   useEffect(() => {
@@ -1367,6 +1378,7 @@ const App: React.FC = () => {
                 <div className="flex bg-gray-200 p-0.5 rounded-md">
                   <button onClick={() => setRightSidebarTab('quick')} className={`text-[10px] px-2 py-1 rounded transition-colors ${rightSidebarTab === 'quick' ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}>快捷发送</button>
                   <button onClick={() => setRightSidebarTab('color')} className={`text-[10px] px-2 py-1 rounded transition-colors ${rightSidebarTab === 'color' ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}>染色</button>
+                  <button onClick={() => setRightSidebarTab('extract')} className={`text-[10px] px-2 py-1 rounded transition-colors ${rightSidebarTab === 'extract' ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}>提取</button>
                 </div>
               </div>
             </div>
@@ -1378,11 +1390,17 @@ const App: React.FC = () => {
                 onToggleCollapse={() => {}}
                 hideHeader
               />
-            ) : (
+            ) : rightSidebarTab === 'color' ? (
               <ColorRuleList
                 rules={colorRules}
                 onUpdate={setColorRules}
                 onRefreshAll={() => setColorVersion(v => v + 1)}
+              />
+            ) : (
+              <ExtractRuleList
+                rules={extractRules}
+                onUpdate={setExtractRules}
+                logs={displayLogs}
               />
             )}
           </aside>
