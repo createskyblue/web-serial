@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { SerialConfig, DataBits, StopBits, Parity, CommMode } from '../types';
 
 interface SerialPort {
@@ -146,6 +146,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   isCollapsed,
   onToggleCollapse
 }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // 自定义波特率状态
   const [isCustomBaudRate, setIsCustomBaudRate] = useState(() => {
     const saved = localStorage.getItem('is_custom_baudrate');
@@ -395,7 +397,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
           <div className="pt-4 border-t">
             <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">终端设置</label>
-            <div className="space-y-3 p-3 bg-gray-50 rounded-md border border-gray-200">
+            <div className="space-y-3 p-3 bg-gray-50 rounded-md border border-gray-200 overflow-hidden">
               <label className="flex items-center text-xs text-gray-700 cursor-pointer">
                 <input
                   type="checkbox"
@@ -417,16 +419,16 @@ const Sidebar: React.FC<SidebarProps> = ({
               </label>
 
               {isGroupByTimeout && (
-                <div className="flex items-center text-xs text-gray-700 pl-5">
-                  <span className="shrink-0">空闲超过</span>
+                <div className="flex items-center text-xs text-gray-700 pl-5 min-w-0">
+                  <span>空闲超过</span>
                   <input
                     type="number"
                     value={groupTimeoutMs}
                     onChange={(e) => setGroupTimeoutMs(Math.max(1, Number(e.target.value)))}
-                    className="w-16 mx-1 px-1 border rounded text-center outline-none focus:ring-1 focus:ring-blue-500 text-xs"
+                    className="w-14 mx-1 px-1 border rounded text-center outline-none focus:ring-1 focus:ring-blue-500 text-xs shrink-0"
                     min="1"
                   />
-                  <span className="shrink-0">ms 则换行</span>
+                  <span className="whitespace-nowrap">ms 则换行</span>
                 </div>
               )}
 
@@ -439,6 +441,77 @@ const Sidebar: React.FC<SidebarProps> = ({
                 />
                 <span>自动滚动到底部</span>
               </label>
+            </div>
+          </div>
+
+          {/* 导入/导出配置 */}
+          <div className="pt-4 border-t">
+            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">配置管理</label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  const exportData: Record<string, any> = {
+                    serial_config: config,
+                    comm_mode: commMode,
+                    ws_url: wsUrl,
+                    bluetooth_service_uuid: bluetoothServiceUUID,
+                    bluetooth_tx_characteristic_uuid: bluetoothTxCharacteristicUUID,
+                    bluetooth_rx_characteristic_uuid: bluetoothRxCharacteristicUUID,
+                    max_buffer_size: maxBufferSize,
+                    is_group_by_timeout: isGroupByTimeout,
+                    group_timeout_ms: groupTimeoutMs,
+                    is_show_timestamp: isShowTimestamp,
+                    is_auto_scroll: isAutoScroll
+                  };
+                  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `serial_config_${new Date().getTime()}.json`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="flex-1 py-1.5 text-[10px] bg-gray-100 hover:bg-gray-200 text-gray-700 rounded border border-gray-300 transition-colors"
+              >
+                <i className="fas fa-file-export mr-1"></i>导出配置
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex-1 py-1.5 text-[10px] bg-gray-100 hover:bg-gray-200 text-gray-700 rounded border border-gray-300 transition-colors"
+              >
+                <i className="fas fa-file-import mr-1"></i>导入配置
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = (ev) => {
+                    try {
+                      const json = JSON.parse(ev.target?.result as string);
+                      if (json.serial_config) setConfig(json.serial_config);
+                      if (json.comm_mode) setCommMode(json.comm_mode);
+                      if (json.ws_url !== undefined) setWsUrl(json.ws_url);
+                      if (json.bluetooth_service_uuid !== undefined) setBluetoothServiceUUID(json.bluetooth_service_uuid);
+                      if (json.bluetooth_tx_characteristic_uuid !== undefined) setBluetoothTxCharacteristicUUID(json.bluetooth_tx_characteristic_uuid);
+                      if (json.bluetooth_rx_characteristic_uuid !== undefined) setBluetoothRxCharacteristicUUID(json.bluetooth_rx_characteristic_uuid);
+                      if (json.max_buffer_size) setMaxBufferSize(json.max_buffer_size);
+                      if (json.is_group_by_timeout !== undefined) setIsGroupByTimeout(json.is_group_by_timeout);
+                      if (json.group_timeout_ms) setGroupTimeoutMs(json.group_timeout_ms);
+                      if (json.is_show_timestamp !== undefined) setIsShowTimestamp(json.is_show_timestamp);
+                      if (json.is_auto_scroll !== undefined) setIsAutoScroll(json.is_auto_scroll);
+                    } catch {
+                      alert('无效的配置文件');
+                    }
+                  };
+                  reader.readAsText(file);
+                  e.target.value = '';
+                }}
+                className="hidden"
+                accept=".json"
+              />
             </div>
           </div>
         </div>
