@@ -1210,6 +1210,7 @@ const App: React.FC = () => {
             <div className="bg-gray-100 p-1 rounded-lg flex border border-gray-200">
               <button onClick={() => setDisplayMode(DisplayMode.Text)} className={`px-3 py-1 text-xs rounded-md transition-colors ${displayMode === DisplayMode.Text ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}>文本</button>
               <button onClick={() => setDisplayMode(DisplayMode.Hex)} className={`px-3 py-1 text-xs rounded-md transition-colors ${displayMode === DisplayMode.Hex ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}>HEX</button>
+              <button onClick={() => setDisplayMode(DisplayMode.SplitView)} className={`px-3 py-1 text-xs rounded-md transition-colors ${displayMode === DisplayMode.SplitView ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}>同窗</button>
             </div>
             
             <div className="flex bg-white border rounded-md overflow-hidden shadow-sm">

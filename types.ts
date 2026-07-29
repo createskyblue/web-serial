@@ -26,7 +26,8 @@ export interface SerialConfig {
 
 export enum DisplayMode {
   Text = 'text',
-  Hex = 'hex'
+  Hex = 'hex',
+  SplitView = 'splitview'
 }
 
 export enum FileSendMode {

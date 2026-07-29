@@ -62,7 +62,7 @@ const Terminal: React.FC<TerminalProps> = ({
     <div className="flex-1 bg-white rounded-xl overflow-hidden shadow-sm flex flex-col relative border border-gray-200 h-full">
       <div
         ref={scrollContainerRef}
-        className="flex-1 p-4 overflow-y-auto custom-scrollbar font-mono text-[13px] bg-slate-50/20 whitespace-pre-wrap break-all"
+        className={`flex-1 p-4 overflow-y-auto custom-scrollbar font-mono text-[13px] bg-slate-50/20 ${displayMode !== DisplayMode.SplitView ? 'whitespace-pre-wrap break-all' : ''}`}
       >
         <div ref={sentinelRef} className="h-1 w-full" />
 
@@ -79,42 +79,111 @@ const Terminal: React.FC<TerminalProps> = ({
           </div>
         )}
 
-        <div className="inline">
-          {logs.map((log, idx) => {
-            const isSystem = log.type !== 'rx' && log.type !== 'tx';
-            if (isSystem) {
+        {displayMode === DisplayMode.SplitView ? (
+          <div className="flex">
+            {/* 左侧：文本列 */}
+            <div className="flex-1 overflow-x-auto whitespace-pre border-r border-gray-300 pr-3 min-w-0">
+              {logs.map((log, idx) => {
+                const isSystem = log.type !== 'rx' && log.type !== 'tx';
+                if (isSystem) {
+                  return (
+                    <span key={log.id} className="text-amber-600 block my-2 text-xs border-l-2 border-amber-200 pl-2">
+                      {log.text}
+                    </span>
+                  );
+                }
+                const isFirst = idx === 0;
+                const prevLog = idx > 0 ? logs[idx - 1] : null;
+                const prevIsSystem = prevLog && prevLog.type !== 'rx' && prevLog.type !== 'tx';
+                const prevEndsNewline = prevLog && !prevIsSystem && prevLog.text.endsWith('\n');
+                const secondChanged = prevLog && !prevIsSystem &&
+                  Math.floor(log.timestamp.getTime() / 1000) !== Math.floor(prevLog.timestamp.getTime() / 1000);
+                const showTs = isShowTimestamp && (isFirst || prevEndsNewline || secondChanged);
+                return (
+                  <span key={log.id} className={log.type === 'tx' ? 'text-blue-600' : 'text-slate-800'}>
+                    {showTs && (
+                      <span className="text-gray-400 text-[10px] select-none opacity-70 mr-1">
+                        [{log.timestamp.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalDigits: 3 } as any)}]
+                      </span>
+                    )}
+                    {log.text}
+                  </span>
+                );
+              })}
+            </div>
+            {/* 右侧：HEX 列 */}
+            <div className="flex-1 overflow-x-auto whitespace-pre pl-3 min-w-0">
+              {logs.map((log, idx) => {
+                const isSystem = log.type !== 'rx' && log.type !== 'tx';
+                if (isSystem) {
+                  return (
+                    <span key={log.id} className="text-amber-600 block my-2 text-xs border-l-2 border-amber-200 pl-2">
+                      {log.text}
+                    </span>
+                  );
+                }
+                const isFirst = idx === 0;
+                const prevLog = idx > 0 ? logs[idx - 1] : null;
+                const prevIsSystem = prevLog && prevLog.type !== 'rx' && prevLog.type !== 'tx';
+                const prevEndsNewline = prevLog && !prevIsSystem && prevLog.text.endsWith('\n');
+                const secondChanged = prevLog && !prevIsSystem &&
+                  Math.floor(log.timestamp.getTime() / 1000) !== Math.floor(prevLog.timestamp.getTime() / 1000);
+                const showTs = isShowTimestamp && (isFirst || prevEndsNewline || secondChanged);
+                return (
+                  <span key={log.id} className={log.type === 'tx' ? 'text-blue-600' : 'text-slate-800'}>
+                    {showTs && (
+                      <span className="text-gray-400 text-[10px] select-none opacity-70 mr-1">
+                        [{log.timestamp.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalDigits: 3 } as any)}]
+                      </span>
+                    )}
+                    {(() => {
+                      const newlineCount = (log.text.match(/\n/g) || []).length;
+                      const suffix = newlineCount > 0 ? '\n'.repeat(newlineCount) : ' ';
+                      return uint8ArrayToHex(log.data) + suffix;
+                    })()}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="inline">
+            {logs.map((log, idx) => {
+              const isSystem = log.type !== 'rx' && log.type !== 'tx';
+              if (isSystem) {
+                return (
+                  <span key={log.id} className="text-amber-600 block my-2 text-xs border-l-2 border-amber-200 pl-2">
+                    {log.text}
+                  </span>
+                );
+              }
+
+              // 时间戳：仅在第一条、上条以 \n 结尾、或秒数变化时显示
+              const isFirst = idx === 0;
+              const prevLog = idx > 0 ? logs[idx - 1] : null;
+              const prevIsSystem = prevLog && prevLog.type !== 'rx' && prevLog.type !== 'tx';
+              const prevEndsNewline = prevLog && !prevIsSystem && prevLog.text.endsWith('\n');
+              const secondChanged = prevLog && !prevIsSystem &&
+                Math.floor(log.timestamp.getTime() / 1000) !== Math.floor(prevLog.timestamp.getTime() / 1000);
+              const showTs = isShowTimestamp && (isFirst || prevEndsNewline || secondChanged);
+
               return (
-                <span key={log.id} className="text-amber-600 block my-2 text-xs border-l-2 border-amber-200 pl-2">
-                  {log.text}
+                <span key={log.id} className={log.type === 'tx' ? 'text-blue-600' : 'text-slate-800'}>
+                  {showTs && (
+                    <span className="text-gray-400 text-[10px] select-none opacity-70 mr-1">
+                      [{log.timestamp.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalDigits: 3 } as any)}]
+                    </span>
+                  )}
+                  {displayMode === DisplayMode.Hex
+                    ? (isGroupByTimeout
+                      ? uint8ArrayToHex(log.data) + '\n'
+                      : uint8ArrayToHex(log.data) + ' ')
+                    : log.text}
                 </span>
               );
-            }
-
-            // 时间戳：仅在第一条、上条以 \n 结尾、或秒数变化时显示
-            const isFirst = idx === 0;
-            const prevLog = idx > 0 ? logs[idx - 1] : null;
-            const prevIsSystem = prevLog && prevLog.type !== 'rx' && prevLog.type !== 'tx';
-            const prevEndsNewline = prevLog && !prevIsSystem && prevLog.text.endsWith('\n');
-            const secondChanged = prevLog && !prevIsSystem &&
-              Math.floor(log.timestamp.getTime() / 1000) !== Math.floor(prevLog.timestamp.getTime() / 1000);
-            const showTs = isShowTimestamp && (isFirst || prevEndsNewline || secondChanged);
-
-            return (
-              <span key={log.id} className={log.type === 'tx' ? 'text-blue-600' : 'text-slate-800'}>
-                {showTs && (
-                  <span className="text-gray-400 text-[10px] select-none opacity-70 mr-1">
-                    [{log.timestamp.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalDigits: 3 } as any)}]
-                  </span>
-                )}
-                {displayMode === DisplayMode.Hex
-                  ? (isGroupByTimeout
-                    ? uint8ArrayToHex(log.data) + '\n'
-                    : uint8ArrayToHex(log.data) + ' ')
-                  : log.text}
-              </span>
-            );
-          })}
-        </div>
+            })}
+          </div>
+        )}
         <div ref={terminalEndRef} className="h-4 w-full invisible" />
       </div>
 
