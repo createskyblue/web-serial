@@ -318,11 +318,20 @@ const App: React.FC = () => {
     if (!isGroupByTimeout) return visibleLogs;
 
     const mergeGroup = (group: LogEntry[]): LogEntry => {
-      if (group.length === 1) return group[0];
       const first = group[0];
-      const mergedText = group.map(l => l.text).join('');
+      let mergedText = group.map(l => l.text).join('');
+      // 确保每组以换行结尾，在 inline 模式下能正确分行
+      if (!mergedText.endsWith('\n')) mergedText += '\n';
+      if (group.length === 1 && mergedText === first.text) return first; // 无需修改
+      // 拼接实际字节数组（HEX 模式需要）
       const totalLen = group.reduce((s, l) => s + l.data.length, 0);
-      return { ...first, text: mergedText, data: new Uint8Array(totalLen), byteCount: totalLen };
+      const mergedData = new Uint8Array(totalLen);
+      let offset = 0;
+      for (const l of group) {
+        mergedData.set(l.data, offset);
+        offset += l.data.length;
+      }
+      return { ...first, text: mergedText, data: mergedData, byteCount: totalLen };
     };
 
     const result: LogEntry[] = [];
