@@ -1147,6 +1147,8 @@ const App: React.FC = () => {
   // 键盘快捷键： [ 折叠/展开左侧栏， ] 折叠/展开右侧栏
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // 带有修饰键时不响应（如 Ctrl+C 复制、Ctrl+V 粘贴）
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
       // 不在输入框中响应快捷键
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
