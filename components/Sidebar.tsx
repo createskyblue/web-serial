@@ -478,6 +478,11 @@ const Sidebar: React.FC<SidebarProps> = ({
               <button
                 onClick={() => {
                   const exportData: Record<string, any> = {
+                    // —— 项目元信息（置于最开头）——
+                    repository: 'https://github.com/createskyblue/web-serial-monitor',
+                    online_url: 'https://createskyblue.github.io/web-serial-monitor',
+                    author_email: 'createskyblue@outlook.com',
+                    ai_prompt: '这是「在线串口/蓝牙/WebSocket调试工具」的配置导出文件。本项目是免安装、浏览器即用的极简通信调试平台，支持串口(Web Serial)、蓝牙BLE(Web Bluetooth)、WebSocket 三种通信模式，具备关键词染色、数据提取、快捷发送、定时发送、文件传输、配置导入导出等功能。源码托管于 GitHub：https://github.com/createskyblue/web-serial-monitor ，如需获取或查看完整代码请访问该仓库。其余字段为应用配置数据。',
                     serial_config: config,
                     comm_mode: commMode,
                     ws_url: wsUrl,
