@@ -217,6 +217,7 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs, onRefreshAll
     const newRule: Rule = {
       id: Math.random().toString(36).substr(2, 9),
       color: '#e53e3e',
+      bgColor: '',
       leftKey: '',
       leftKeyMode: DisplayMode.Text,
       rightKey: '',
@@ -312,8 +313,27 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs, onRefreshAll
                   type="color"
                   value={rule.color}
                   onChange={(e) => updateRule(rule.id, { color: e.target.value })}
+                  title="文字颜色"
                   className="w-6 h-6 rounded cursor-pointer border-0 p-0 shrink-0"
                 />
+                {/* 背景色（可选）：未设置时置灰，设置后右上角出现小叉可清除 */}
+                <div className="relative shrink-0">
+                  <input
+                    type="color"
+                    value={rule.bgColor || '#f6e05e'}
+                    onChange={(e) => updateRule(rule.id, { bgColor: e.target.value })}
+                    title={rule.bgColor ? `背景色 ${rule.bgColor}（点右上角 × 清除）` : '背景色（可选）'}
+                    className="w-6 h-6 rounded cursor-pointer border-0 p-0 shrink-0"
+                    style={rule.bgColor ? undefined : { opacity: 0.35, filter: 'grayscale(1)' }}
+                  />
+                  {rule.bgColor && (
+                    <span
+                      onClick={() => updateRule(rule.id, { bgColor: '' })}
+                      title="清除背景色"
+                      className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-gray-300 hover:bg-red-500 text-white rounded-full flex items-center justify-center cursor-pointer text-[8px] leading-none select-none"
+                    >×</span>
+                  )}
+                </div>
                 <input
                   type="text"
                   value={rule.leftKey}

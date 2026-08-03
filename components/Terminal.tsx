@@ -5,6 +5,7 @@ import { hexToUint8Array, uint8ArrayToString } from '../utils/converters';
 interface ColorSegment {
   text: string;
   color?: string;
+  bgColor?: string;
 }
 
 function highlightText(text: string, data: Uint8Array, rules: Rule[]): ColorSegment[] {
@@ -15,6 +16,7 @@ function highlightText(text: string, data: Uint8Array, rules: Rule[]): ColorSegm
     start: number;
     end: number;
     color: string;
+    bgColor?: string;
     priority: number;
   }
   const intervals: Interval[] = [];
@@ -49,6 +51,7 @@ function highlightText(text: string, data: Uint8Array, rules: Rule[]): ColorSegm
           start: leftIdx,
           end: rightIdx + rightText.length,
           color: rule.color,
+          bgColor: rule.bgColor,
           priority: ri
         });
         searchFrom = rightIdx + rightText.length;
@@ -63,6 +66,7 @@ function highlightText(text: string, data: Uint8Array, rules: Rule[]): ColorSegm
           start: idx,
           end: idx + leftText.length,
           color: rule.color,
+          bgColor: rule.bgColor,
           priority: ri
         });
         searchFrom = idx + 1;
@@ -107,7 +111,7 @@ function highlightText(text: string, data: Uint8Array, rules: Rule[]): ColorSegm
     if (iv.start > pos) {
       segments.push({ text: text.slice(pos, iv.start) });
     }
-    segments.push({ text: text.slice(iv.start, iv.end), color: iv.color });
+    segments.push({ text: text.slice(iv.start, iv.end), color: iv.color, bgColor: iv.bgColor });
     pos = iv.end;
   }
   if (pos < text.length) {
@@ -195,7 +199,7 @@ const Terminal: React.FC<TerminalProps> = ({
           const s = Math.max(r.start, logStart);
           const e = Math.min(r.end, logEnd);
           if (s < e) {
-            segs.push({ text: r.seg.text.slice(s - r.start, e - r.start), color: r.seg.color });
+            segs.push({ text: r.seg.text.slice(s - r.start, e - r.start), color: r.seg.color, bgColor: r.seg.bgColor });
           }
           if (r.end <= logEnd) si++;
           else break; // 该片段跨越到下一个日志，保留 si 供下一条继续切
@@ -327,7 +331,7 @@ const Terminal: React.FC<TerminalProps> = ({
                       </span>
                     )}
                     {segments.map((seg, si) => (
-                      <span key={si} style={seg.color ? { color: seg.color } : undefined}>{seg.text}</span>
+                      <span key={si} style={{ color: seg.color, backgroundColor: seg.bgColor }}>{seg.text}</span>
                     ))}
                   </span>
                 );
@@ -361,7 +365,7 @@ const Terminal: React.FC<TerminalProps> = ({
                     {segments.map((seg, si) => {
                       const bytes = new TextEncoder().encode(seg.text);
                       return (
-                        <span key={si} style={seg.color ? { color: seg.color } : undefined}>{bytesToHexWithBreaks(bytes)}</span>
+                        <span key={si} style={{ color: seg.color, backgroundColor: seg.bgColor }}>{bytesToHexWithBreaks(bytes)}</span>
                       );
                     })}
                   </span>
@@ -401,11 +405,11 @@ const Terminal: React.FC<TerminalProps> = ({
                     ? segments.map((seg, si) => {
                         const bytes = new TextEncoder().encode(seg.text);
                         return (
-                          <span key={si} style={seg.color ? { color: seg.color } : undefined}>{bytesToHexWithBreaks(bytes)}</span>
+                          <span key={si} style={{ color: seg.color, backgroundColor: seg.bgColor }}>{bytesToHexWithBreaks(bytes)}</span>
                         );
                       })
                     : segments.map((seg, si) => (
-                      <span key={si} style={seg.color ? { color: seg.color } : undefined}>{seg.text}</span>
+                      <span key={si} style={{ color: seg.color, backgroundColor: seg.bgColor }}>{seg.text}</span>
                     ))}
                 </span>
               );
