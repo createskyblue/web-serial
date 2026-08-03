@@ -353,12 +353,15 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs, onRefreshAll
                   </span>
                 )}
               </div>
-              {/* 行3: 提取结果显示区 */}
-              <div className={`p-1.5 rounded text-[10px] font-mono min-h-[28px] max-h-[80px] overflow-auto custom-scrollbar whitespace-pre-wrap break-all border ${hasMatch ? 'bg-white border-gray-300 text-gray-800' : 'bg-gray-100 border-gray-200 text-gray-400'}`}>
-                {hasMatch ? displayText : (
-                  <span className="italic">等待匹配...</span>
-                )}
-              </div>
+              {/* 行3: 提取结果显示区（只读输出框：可鼠标选中复制，右下角可拖拽调整大小） */}
+              <textarea
+                readOnly
+                value={hasMatch ? displayText : '等待匹配...'}
+                rows={2}
+                spellCheck={false}
+                title="可选中复制；拖拽右下角调整大小"
+                className={`w-full px-1.5 py-1 rounded text-[10px] font-mono min-h-[28px] resize-y overflow-auto custom-scrollbar whitespace-pre-wrap break-all border outline-none ${hasMatch ? 'bg-white border-gray-300 text-gray-800' : 'bg-gray-100 border-gray-200 text-gray-400'}`}
+              />
             </div>
           );
         })}
