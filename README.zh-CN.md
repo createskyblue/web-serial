@@ -4,8 +4,8 @@
 
 免安装、浏览器即用的极简通信调试平台。串口、蓝牙、WebSocket 三合一，实时收发 + 关键词染色 + 数据提取。
 
-GitHub：https://github.com/createskyblue/web-serial-monitor
-在线使用：https://createskyblue.github.io/web-serial-monitor/
+- GitHub：[https://github.com/createskyblue/web-serial-monitor](https://github.com/createskyblue/web-serial-monitor)
+- 在线使用：[https://createskyblue.github.io/web-serial-monitor](https://createskyblue.github.io/web-serial-monitor)
 
 ![界面预览](img/PixPin_2026-08-03_12-18-10.jpg)
 
