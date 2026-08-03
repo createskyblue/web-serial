@@ -21,7 +21,8 @@ export interface SerialConfig {
   stopBits: StopBits;
   parity: Parity;
   bufferSize: number;
-  flowControl: 'none' | 'hardware';
+  dtr: boolean;  // 初始流控 DTR（连接瞬间应用，可预置）
+  rts: boolean;  // 初始流控 RTS（连接瞬间应用，可预置）
 }
 
 export enum DisplayMode {

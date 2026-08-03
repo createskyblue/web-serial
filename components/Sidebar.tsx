@@ -10,7 +10,6 @@ interface SerialPort {
     stopBits?: number;
     parity?: string;
     bufferSize?: number;
-    flowControl?: string;
   }): Promise<void>;
   close(): Promise<void>;
 }
@@ -395,18 +394,14 @@ const Sidebar: React.FC<SidebarProps> = ({
                   </button>
                   <button
                     type="button"
-                    disabled={isConnected && config.flowControl === 'hardware'}
                     onClick={() => onSetRTS?.(!rtsSignal)}
                     title="Request To Send"
-                    className={`px-2.5 py-1 rounded-md text-xs font-bold border transition-colors ${rtsSignal ? 'bg-blue-500 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'} ${isConnected && config.flowControl === 'hardware' ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                    className={`px-2.5 py-1 rounded-md text-xs font-bold border transition-colors cursor-pointer ${rtsSignal ? 'bg-blue-500 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}
                   >
                     RTS
                   </button>
                 </div>
               </div>
-              {isConnected && config.flowControl === 'hardware' && (
-                <p className="text-[10px] text-amber-600 mt-1">硬件流控模式下 RTS 由驱动自动管理</p>
-              )}
             </>
           )}
 
@@ -524,7 +519,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   reader.onload = (ev) => {
                     try {
                       const json = JSON.parse(ev.target?.result as string);
-                      if (json.serial_config) setConfig(json.serial_config);
+                      if (json.serial_config) setConfig(prev => ({ ...prev, ...json.serial_config }));
                       if (json.comm_mode) setCommMode(json.comm_mode);
                       if (json.ws_url !== undefined) setWsUrl(json.ws_url);
                       if (json.bluetooth_service_uuid !== undefined) setBluetoothServiceUUID(json.bluetooth_service_uuid);

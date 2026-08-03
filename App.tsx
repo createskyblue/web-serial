@@ -69,7 +69,6 @@ interface SerialPort {
     stopBits?: number;
     parity?: string;
     bufferSize?: number;
-    flowControl?: string;
   }): Promise<void>;
   close(): Promise<void>;
   getSignals(): Promise<SerialSignals>;
@@ -79,10 +78,6 @@ interface SerialPort {
 const App: React.FC = () => {
   const [port, setPort] = useState<SerialPort | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-
-  // 流控信号状态（DTR / RTS）
-  const [dtrSignal, setDtrSignal] = useState(true);
-  const [rtsSignal, setRtsSignal] = useState(false);
 
   // 串口选择状态管理
   const [savedSerialPort, setSavedSerialPort] = useState<SerialPort | null>(null);
@@ -137,22 +132,25 @@ const App: React.FC = () => {
   const bluetoothRxCharacteristicRef = useRef<BluetoothRemoteGATTCharacteristic | null>(null);
 
   const [config, setConfig] = useState<SerialConfig>(() => {
-    const saved = localStorage.getItem('serial_config');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // 解析失败，使用默认值
-      }
-    }
-    return {
+    const DEFAULT_CONFIG: SerialConfig = {
       baudRate: 115200,
       dataBits: DataBits.Eight,
       stopBits: StopBits.One,
       parity: Parity.None,
       bufferSize: 255,
-      flowControl: 'none'
+      dtr: true,
+      rts: false
     };
+    const saved = localStorage.getItem('serial_config');
+    if (saved) {
+      try {
+        // 合并默认值，确保旧配置缺少的字段（如 dtr/rts）有默认值
+        return { ...DEFAULT_CONFIG, ...JSON.parse(saved) };
+      } catch {
+        // 解析失败，使用默认值
+      }
+    }
+    return DEFAULT_CONFIG;
   });
   
   const [logChunks, setLogChunks] = useState<LogEntry[][]>([[]]);
@@ -673,8 +671,7 @@ const App: React.FC = () => {
         baudRate: config.baudRate,
         dataBits: config.dataBits,
         stopBits: config.stopBits,
-        parity: config.parity,
-        flowControl: config.flowControl
+        parity: config.parity
       });
       setPort(targetPort);
       setIsConnected(true);
@@ -682,15 +679,15 @@ const App: React.FC = () => {
 
       // 应用预设的流控信号（连接瞬间的初始 DTR/RTS 状态）
       try {
-        await targetPort.setSignals({ dataTerminalReady: dtrSignal, requestToSend: rtsSignal });
+        await targetPort.setSignals({ dataTerminalReady: config.dtr, requestToSend: config.rts });
       } catch {
         // 忽略：部分芯片/驱动不支持设置流控信号
       }
       // 回读实际信号状态，让开关反映真实硬件状态
       try {
         const signals = await targetPort.getSignals();
-        if (typeof signals.dataTerminalReady === 'boolean') setDtrSignal(signals.dataTerminalReady);
-        if (typeof signals.requestToSend === 'boolean') setRtsSignal(signals.requestToSend);
+        if (typeof signals.dataTerminalReady === 'boolean') setConfig(prev => ({ ...prev, dtr: signals.dataTerminalReady! }));
+        if (typeof signals.requestToSend === 'boolean') setConfig(prev => ({ ...prev, rts: signals.requestToSend! }));
       } catch {
         // 部分设备/驱动不支持回读，忽略并保持当前值
       }
@@ -716,7 +713,7 @@ const App: React.FC = () => {
 
   // 设置 DTR 信号（未连接时仅预设，连接瞬间生效）
   const setDTR = async (value: boolean) => {
-    setDtrSignal(value);
+    setConfig(prev => ({ ...prev, dtr: value }));
     if (!port || !isConnected) return;
     try {
       await port.setSignals({ dataTerminalReady: value });
@@ -725,10 +722,10 @@ const App: React.FC = () => {
     }
   };
 
-  // 设置 RTS 信号（未连接时仅预设；硬件流控连接时由驱动管理，禁止手动设置）
+  // 设置 RTS 信号（未连接时仅预设，连接瞬间生效）
   const setRTS = async (value: boolean) => {
-    setRtsSignal(value);
-    if (!port || !isConnected || config.flowControl === 'hardware') return;
+    setConfig(prev => ({ ...prev, rts: value }));
+    if (!port || !isConnected) return;
     try {
       await port.setSignals({ requestToSend: value });
     } catch (err: any) {
@@ -1254,7 +1251,7 @@ const App: React.FC = () => {
           bluetoothServiceUUID={bluetoothServiceUUID} setBluetoothServiceUUID={setBluetoothServiceUUID}
           bluetoothTxCharacteristicUUID={bluetoothTxCharacteristicUUID} setBluetoothTxCharacteristicUUID={setBluetoothTxCharacteristicUUID}
           bluetoothRxCharacteristicUUID={bluetoothRxCharacteristicUUID} setBluetoothRxCharacteristicUUID={setBluetoothRxCharacteristicUUID}
-          dtrSignal={dtrSignal} rtsSignal={rtsSignal}
+          dtrSignal={config.dtr} rtsSignal={config.rts}
           onSetDTR={setDTR} onSetRTS={setRTS}
           rules={rules} setRules={setRules}
           quickSendItems={quickSendItems} setQuickSendItems={setQuickSendItems}
