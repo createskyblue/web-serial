@@ -119,7 +119,7 @@ function highlightText(text: string, data: Uint8Array, rules: ColorRule[]): Colo
   return segments;
 }
 
-/** HEX 转换并在 \r \n \r\n 处换行 */
+/** HEX 转换；仅在 \n（或 \r\n 的 \n）处换行，与文本列浏览器的换行行为保持一致 */
 function bytesToHexWithBreaks(bytes: Uint8Array): string {
   let result = '';
   for (let i = 0; i < bytes.length; i++) {
@@ -129,7 +129,7 @@ function bytesToHexWithBreaks(bytes: Uint8Array): string {
       if (i + 1 < bytes.length && bytes[i + 1] === 0x0A) {
         result += ' '; // \r\n 中的 \r 不加换行，留给 \n 处理
       } else {
-        result += '\n'; // 独立 \r
+        result += ' '; // 独立 \r：文本列浏览器渲染不换行，HEX 侧也不换行，保持两列行数一致（如 0D 0D 0A）
       }
     } else if (b === 0x0A) {
       result += '\n'; // \n 或 \r\n 中的 \n
@@ -252,8 +252,8 @@ const Terminal: React.FC<TerminalProps> = ({
 
         {displayMode === DisplayMode.SplitView ? (
           <div className="flex">
-            {/* 左侧：文本列 */}
-            <div className="flex-1 overflow-x-auto whitespace-pre border-r border-gray-300 pr-3 min-w-0">
+            {/* 左侧：文本列（overflow-x-scroll 始终预留横向滚动条高度，保证与右侧列高度对称） */}
+            <div className="flex-1 overflow-x-scroll whitespace-pre border-r border-gray-300 pr-3 min-w-0">
               {coloredLogs.map(({ log, segments }, idx) => {
                 const isSystem = log.type !== 'rx' && log.type !== 'tx';
                 if (isSystem) {
@@ -285,7 +285,7 @@ const Terminal: React.FC<TerminalProps> = ({
               })}
             </div>
             {/* 右侧：HEX 列 */}
-            <div className="flex-1 overflow-x-auto whitespace-pre pl-3 min-w-0">
+            <div className="flex-1 overflow-x-scroll whitespace-pre pl-3 min-w-0">
               {coloredLogs.map(({ log, segments }, idx) => {
                 const isSystem = log.type !== 'rx' && log.type !== 'tx';
                 if (isSystem) {
