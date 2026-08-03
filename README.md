@@ -6,6 +6,10 @@ A browser-based, install-free, minimal communication debug platform. Serial, Blu
 
 ![Screenshot](img/PixPin_2026-08-03_12-18-10.jpg)
 
+| Quick Send | Highlight & Extract |
+| --- | --- |
+| ![Quick Send](img/%E5%BF%AB%E6%8D%B7%E5%8F%91%E9%80%81.jpg) | ![Highlight & Extract](img/%E6%9F%93%E8%89%B2%E5%92%8C%E6%8F%90%E5%8F%96.jpg) |
+
 ## 🚀 Killer Features
 
 ### Three Communication Modes
