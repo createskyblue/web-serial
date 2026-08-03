@@ -44,6 +44,11 @@ interface SidebarProps {
   // 串口选择相关
   hasSavedSerialPort?: boolean;
   onReselectSerialPort?: () => void;
+  // 流控信号控制（DTR / RTS）
+  dtrSignal?: boolean;
+  rtsSignal?: boolean;
+  onSetDTR?: (value: boolean) => void;
+  onSetRTS?: (value: boolean) => void;
   // 折叠相关
   isCollapsed: boolean;
   onToggleCollapse: () => void;
@@ -139,6 +144,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   isReconnecting = false,
   hasSavedSerialPort = false,
   onReselectSerialPort,
+  dtrSignal = true,
+  rtsSignal = false,
+  onSetDTR,
+  onSetRTS,
   isCollapsed,
   onToggleCollapse
 }) => {
@@ -362,10 +371,37 @@ const Sidebar: React.FC<SidebarProps> = ({
                   <option value={Parity.Odd}>Odd (奇)</option>
                 </select>
               </div>
+
+              {/* 流控信号控制（DTR / RTS 两个按钮同行排列，未连接时也可预置） */}
+              <div className="flex items-center justify-between pt-3">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">流控信号</span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onSetDTR?.(!dtrSignal)}
+                    title="Data Terminal Ready"
+                    className={`px-2.5 py-1 rounded-md text-xs font-bold border transition-colors cursor-pointer ${dtrSignal ? 'bg-blue-500 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}
+                  >
+                    DTR
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isConnected && config.flowControl === 'hardware'}
+                    onClick={() => onSetRTS?.(!rtsSignal)}
+                    title="Request To Send"
+                    className={`px-2.5 py-1 rounded-md text-xs font-bold border transition-colors ${rtsSignal ? 'bg-blue-500 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'} ${isConnected && config.flowControl === 'hardware' ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                  >
+                    RTS
+                  </button>
+                </div>
+              </div>
+              {isConnected && config.flowControl === 'hardware' && (
+                <p className="text-[10px] text-amber-600 mt-1">硬件流控模式下 RTS 由驱动自动管理</p>
+              )}
             </>
           )}
 
-          <div>
+          <div className="pt-4 border-t">
             <label className="block text-sm font-medium text-gray-600 mb-1">最大缓冲区大小</label>
             <select value={maxBufferSize} onChange={handleBufferSizeChange} className="w-full bg-gray-50 border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
               {bufferSizes.map(size => (
@@ -392,7 +428,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
           <div className="pt-4 border-t">
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">终端设置</label>
+            <label className="block text-sm font-medium text-gray-600 mb-1">终端设置</label>
             <div className="space-y-3 p-3 bg-gray-50 rounded-md border border-gray-200 overflow-hidden">
               <label className="flex items-center text-xs text-gray-700 cursor-pointer">
                 <input
@@ -433,7 +469,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
           {/* 导入/导出配置 */}
           <div className="pt-4 border-t">
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">配置管理</label>
+            <label className="block text-sm font-medium text-gray-600 mb-1">配置管理</label>
             <div className="flex gap-2">
               <button
                 onClick={() => {

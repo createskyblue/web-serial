@@ -52,6 +52,16 @@ import QuickSendList from './components/QuickSendList';
 import ColorRuleList from './components/ColorRuleList';
 import ExtractRuleList from './components/ExtractRuleList';
 
+interface SerialSignals {
+  dataTerminalReady?: boolean;
+  requestToSend?: boolean;
+  break?: boolean;
+  carrierDetect?: boolean;
+  clearToSend?: boolean;
+  dataSetReady?: boolean;
+  ringIndicator?: boolean;
+}
+
 interface SerialPort {
   readonly readable: ReadableStream<Uint8Array> | null;
   readonly writable: WritableStream<Uint8Array> | null;
@@ -64,11 +74,17 @@ interface SerialPort {
     flowControl?: string;
   }): Promise<void>;
   close(): Promise<void>;
+  getSignals(): Promise<SerialSignals>;
+  setSignals(signals: SerialSignals): Promise<void>;
 }
 
 const App: React.FC = () => {
   const [port, setPort] = useState<SerialPort | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+
+  // 流控信号状态（DTR / RTS）
+  const [dtrSignal, setDtrSignal] = useState(true);
+  const [rtsSignal, setRtsSignal] = useState(false);
 
   // 串口选择状态管理
   const [savedSerialPort, setSavedSerialPort] = useState<SerialPort | null>(null);
@@ -672,6 +688,21 @@ const App: React.FC = () => {
       setIsConnected(true);
       keepReadingRef.current = true;
 
+      // 应用预设的流控信号（连接瞬间的初始 DTR/RTS 状态）
+      try {
+        await targetPort.setSignals({ dataTerminalReady: dtrSignal, requestToSend: rtsSignal });
+      } catch {
+        // 忽略：部分芯片/驱动不支持设置流控信号
+      }
+      // 回读实际信号状态，让开关反映真实硬件状态
+      try {
+        const signals = await targetPort.getSignals();
+        if (typeof signals.dataTerminalReady === 'boolean') setDtrSignal(signals.dataTerminalReady);
+        if (typeof signals.requestToSend === 'boolean') setRtsSignal(signals.requestToSend);
+      } catch {
+        // 部分设备/驱动不支持回读，忽略并保持当前值
+      }
+
       // 监听串口断开事件（硬件拔除）
       const onDisconnect = () => {
         addLog('info', new Uint8Array(), '串口硬件已断开');
@@ -688,6 +719,28 @@ const App: React.FC = () => {
       addLog('error', new Uint8Array(), `打开串口失败: ${err.message}`);
       // 如果打开失败，清除保存的串口
       setSavedSerialPort(null);
+    }
+  };
+
+  // 设置 DTR 信号（未连接时仅预设，连接瞬间生效）
+  const setDTR = async (value: boolean) => {
+    setDtrSignal(value);
+    if (!port || !isConnected) return;
+    try {
+      await port.setSignals({ dataTerminalReady: value });
+    } catch (err: any) {
+      addLog('error', new Uint8Array(), `设置 DTR 失败: ${err.message}`);
+    }
+  };
+
+  // 设置 RTS 信号（未连接时仅预设；硬件流控连接时由驱动管理，禁止手动设置）
+  const setRTS = async (value: boolean) => {
+    setRtsSignal(value);
+    if (!port || !isConnected || config.flowControl === 'hardware') return;
+    try {
+      await port.setSignals({ requestToSend: value });
+    } catch (err: any) {
+      addLog('error', new Uint8Array(), `设置 RTS 失败: ${err.message}`);
     }
   };
 
@@ -738,6 +791,7 @@ const App: React.FC = () => {
 
     setIsConnected(false);
     setIsPaused(false);
+    // 保留 DTR/RTS 预设值，便于下次连接时复用
 
     // 延迟重置标志，防止短时间内重复触发
     setTimeout(() => {
@@ -1208,6 +1262,8 @@ const App: React.FC = () => {
           bluetoothServiceUUID={bluetoothServiceUUID} setBluetoothServiceUUID={setBluetoothServiceUUID}
           bluetoothTxCharacteristicUUID={bluetoothTxCharacteristicUUID} setBluetoothTxCharacteristicUUID={setBluetoothTxCharacteristicUUID}
           bluetoothRxCharacteristicUUID={bluetoothRxCharacteristicUUID} setBluetoothRxCharacteristicUUID={setBluetoothRxCharacteristicUUID}
+          dtrSignal={dtrSignal} rtsSignal={rtsSignal}
+          onSetDTR={setDTR} onSetRTS={setRTS}
           onConnect={connect} onDisconnect={disconnect}
           isReconnecting={isReconnecting}
           hasSavedSerialPort={!!savedSerialPort}
