@@ -1362,6 +1362,7 @@ const App: React.FC = () => {
               onLoadMore={loadMoreChunks}
               onReachedBottom={handleReachedBottom}
               rules={rules}
+              isConnected={isConnected}
             />
           </div>
         </div>

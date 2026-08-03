@@ -159,13 +159,14 @@ interface TerminalProps {
   /** 用户从历史区域滚回底部时触发（用于卸载已加载的旧渲染区域） */
   onReachedBottom?: () => void;
   rules?: Rule[];
+  isConnected?: boolean;
 }
 
 const Terminal: React.FC<TerminalProps> = ({
   logs, displayMode, isGroupByTimeout, isShowTimestamp, terminalEndRef,
   lineFrequency, totalRxBytes = 0, totalTxBytes = 0,
   totalLogCount, hasMoreChunks = false, hiddenChunksCount = 0, onLoadMore, onReachedBottom,
-  rules = []
+  rules = [], isConnected = false
 }) => {
   // 染色缓存（跨条目：拼接所有日志文本后统一匹配，再按每条日志切回）
   const coloredLogs = useMemo(() => {
@@ -425,8 +426,8 @@ const Terminal: React.FC<TerminalProps> = ({
           <span className="text-blue-600">发送: {totalTxBytes} 字节</span>
           <span className="text-purple-600">换行频率: {lineFrequency !== undefined ? `${lineFrequency} 行/秒` : '0 行/秒'}</span>
         </div>
-        <div className="flex items-center space-x-2 text-green-600">
-          <i className={`fas fa-circle text-[6px] ${(totalLogCount ?? logs.length) > 0 ? 'text-green-500' : 'text-gray-300'}`}></i>
+        <div className={`flex items-center space-x-2 ${isConnected ? 'text-green-600' : 'text-gray-400'}`}>
+          <i className={`fas fa-circle text-[6px] ${isConnected ? 'text-green-500' : 'text-gray-300'}`}></i>
           <span>{now.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
         </div>
       </div>
