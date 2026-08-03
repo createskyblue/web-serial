@@ -281,14 +281,6 @@ const App: React.FC = () => {
   }, [quickSendItems]);
 
   useEffect(() => {
-    localStorage.setItem('left_sidebar_width', leftSidebarWidth.toString());
-  }, [leftSidebarWidth]);
-
-  useEffect(() => {
-    localStorage.setItem('right_sidebar_width', rightSidebarWidth.toString());
-  }, [rightSidebarWidth]);
-
-  useEffect(() => {
     localStorage.setItem('left_sidebar_collapsed', leftSidebarCollapsed.toString());
   }, [leftSidebarCollapsed]);
 
@@ -331,12 +323,8 @@ const App: React.FC = () => {
     return total;
   };
 
-  // 计算当前缓冲区使用量（基于所有块）
-  const calculateBufferSize = useCallback(() => {
-    return calcChunksSize(logChunks);
-  }, [logChunks]);
-
-  const currentBufferSize = calculateBufferSize();
+  // 计算当前缓冲区使用量（基于所有块，仅日志块变化时重算，避免拖拽侧栏时每次渲染全量扫描）
+  const currentBufferSize = useMemo(() => calcChunksSize(logChunks), [logChunks]);
 
   // 派生可见日志
   const visibleLogs = useMemo(() => {
@@ -1145,6 +1133,12 @@ const App: React.FC = () => {
     };
   }, [isDragging]);
 
+  // 拖拽中的最新宽度（供 mouseup 一次性持久化，避免拖拽过程中每次 mousemove 写 localStorage）
+  const leftSidebarWidthRef = useRef(leftSidebarWidth);
+  leftSidebarWidthRef.current = leftSidebarWidth;
+  const rightSidebarWidthRef = useRef(rightSidebarWidth);
+  rightSidebarWidthRef.current = rightSidebarWidth;
+
   // 左侧边栏拖拽调整宽度
   useEffect(() => {
     if (!isDraggingLeftSidebar) return;
@@ -1158,6 +1152,7 @@ const App: React.FC = () => {
       setIsDraggingLeftSidebar(false);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+      localStorage.setItem('left_sidebar_width', String(leftSidebarWidthRef.current));
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -1182,6 +1177,7 @@ const App: React.FC = () => {
       setIsDraggingRightSidebar(false);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+      localStorage.setItem('right_sidebar_width', String(rightSidebarWidthRef.current));
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -1242,7 +1238,7 @@ const App: React.FC = () => {
     <div className="flex h-screen bg-gray-50 overflow-hidden text-gray-800">
       {/* 左侧边栏 */}
       <div
-        className="relative shrink-0 overflow-hidden transition-[width] duration-200 z-20 select-none"
+        className={`relative shrink-0 overflow-hidden z-20 select-none ${isDraggingLeftSidebar ? '' : 'transition-[width] duration-200'}`}
         style={{ width: leftSidebarCollapsed ? 36 : leftSidebarWidth }}
       >
         <Sidebar
@@ -1386,7 +1382,7 @@ const App: React.FC = () => {
 
       {/* 右侧边栏 */}
       <div
-        className="relative shrink-0 overflow-hidden transition-[width] duration-200 z-20 select-none"
+        className={`relative shrink-0 overflow-hidden z-20 select-none ${isDraggingRightSidebar ? '' : 'transition-[width] duration-200'}`}
         style={{ width: rightSidebarCollapsed ? 36 : rightSidebarWidth }}
       >
         {/* 右侧栏拖拽调整大小手柄 */}
