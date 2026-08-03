@@ -177,6 +177,7 @@ const Terminal: React.FC<TerminalProps> = ({
   const prevScrollHeightRef = useRef(0);
   const isLoadingMoreRef = useRef(false);
   const isAtBottomRef = useRef(true); // 用户是否在底部
+  const lastScrollTopRef = useRef(0); // 上次滚动位置，用于判断是否真正向上滚动
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -189,7 +190,15 @@ const Terminal: React.FC<TerminalProps> = ({
     const el = scrollContainerRef.current;
     if (!el) return;
     const threshold = 50; // 距离底部50px以内视为在底部
-    isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+    if (atBottom) {
+      isAtBottomRef.current = true;
+    } else if (el.scrollTop < lastScrollTopRef.current) {
+      // 仅当真正向上滚动（scrollTop 变小）时才解除自动滚动跟随；
+      // 内容增长/延迟派发的 scroll 事件 scrollTop 未变，不会误判为离开底部
+      isAtBottomRef.current = false;
+    }
+    lastScrollTopRef.current = el.scrollTop;
   }, []);
 
   // 新数据到达时，仅在用户处于底部时自动滚动
