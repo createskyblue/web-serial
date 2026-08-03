@@ -271,7 +271,9 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs, onRefreshAll
         return uint8ArrayToHex(bytes);
       } catch { return text; }
     }
-    return text;
+    // 文本模式：镜像终端文本列渲染。textarea 中独立 \r 也算一次换行，而终端 div 里 \r 不换行，
+    // 故 \r\n 归为单个 \n、独立 \r 直接移除，保证与终端一致（如 0D 0D 0A 只换一次行）
+    return text.replace(/\r\n/g, '\n').replace(/\r/g, '');
   };
 
   return (
