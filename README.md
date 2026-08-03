@@ -1,46 +1,48 @@
-# 在线串口 / 蓝牙 / WebSocket 调试工具
+**English** | [中文](./README.zh-CN.md)
 
-免安装、浏览器即用的极简通信调试平台。串口、蓝牙、WebSocket 三合一，实时收发 + 关键词染色 + 数据提取。
+# Online Serial / Bluetooth / WebSocket Debug Tool
 
-![界面预览](img/PixPin_2026-08-03_12-18-10.jpg)
+A browser-based, install-free, minimal communication debug platform. Serial, Bluetooth, and WebSocket in one tool — real-time send/receive + keyword highlighting + data extraction.
 
-## 🚀 王炸特性
+![Screenshot](img/PixPin_2026-08-03_12-18-10.jpg)
 
-### 三种通信模式
-- **串口** — Web Serial API，免驱动，Chrome/Edge 直接开用
-- **WebSocket** — 网络透传/远程串口（需本地部署，见下方说明）
-- **蓝牙 BLE** — Web Bluetooth API，UUID16 / 完整 UUID，TX/RX 双特征
+## 🚀 Killer Features
 
-### 关键词染色 + 提取
-- 填「起始 + 结束」→ **区间模式**：染色该区间 + 提取区间内容
-- 只填「起始」→ **关键词模式**：高亮关键词 + 提取出现时间
-- Text / HEX 双模式匹配，提取结果**自动锁存**，不被新数据挤丢
+### Three Communication Modes
+- **Serial** — Web Serial API, no driver needed, works right in Chrome/Edge
+- **WebSocket** — network passthrough / remote serial (needs local deployment, see Notes)
+- **Bluetooth BLE** — Web Bluetooth API, UUID16 / full UUID, TX/RX characteristics
 
-### 专业调试细节
-- **显示**：文本 / HEX / 同窗（文本|HEX 左右对照），Tab 一键切换
-- **流控**：DTR / RTS 手动控制，连接前可预置初始状态
-- **智能自动滚动**：检测到你在底部才跟随，上翻历史不被拉扯
-- **收发**：定时发送、文件发送（RAW / YModem）、快捷发送列表
-- **管理**：缓冲区保护、导出 TXT/BIN、一键复制、配置导入导出、清屏
+### Keyword Highlight + Extract — one rule does both
+- Fill "start + end" → **Range mode**: highlight the range + extract its content
+- Fill only "start" → **Keyword mode**: highlight the keyword + extract its occurrence time
+- Text / HEX dual-mode matching; extracted results **auto-latch**, never lost by incoming data
 
-### ⌨️ 快捷键
-- `Tab` — 切换显示模式（文本 / HEX / 同窗）
-- `p` — 连接 / 断开
-- `c` — 清屏
-- `Ctrl+Enter` / `Cmd+Enter` — 发送
-- `[` / `]` — 折叠/展开左右侧栏
-- `'` — 折叠/展开发送区
+### Pro Debugging Details
+- **Display**: Text / HEX / Split (Text|HEX side-by-side), `Tab` to switch
+- **Flow control**: DTR / RTS manual control, pre-settable before connecting
+- **Smart auto-scroll**: follows only when you're at the bottom — scrolling up won't yank you
+- **Send**: timed send, file send (RAW / YModem), quick-send list
+- **Manage**: buffer protection, export TXT/BIN, one-click copy, config import/export, clear
 
-## 🛠 快速开始
+### ⌨️ Shortcuts
+- `Tab` — switch display mode (Text / HEX / Split)
+- `p` — connect / disconnect
+- `c` — clear screen
+- `Ctrl+Enter` / `Cmd+Enter` — send
+- `[` / `]` — collapse/expand sidebars
+- `'` — collapse/expand send area
+
+## 🛠 Quick Start
 
 ```bash
 npm install
-npm run dev      # 本地开发
-npm run build    # 生产构建，部署 dist/ 目录即可
+npm run dev      # local development
+npm run build    # production build, deploy the dist/ directory
 ```
 
-## ⚠️ 注意
+## ⚠️ Notes
 
-- 串口 / 蓝牙要求 **HTTPS 或 localhost**（浏览器安全限制）
-- **WebSocket 模式需本地部署**：页面在 HTTPS 下只能连安全的 wss://；要连普通 ws:// 本地/局域网服务，请把本工具跑在 **localhost** 上（`npm run dev` 或 `npm run build` 后本地托管）
-- 建议使用 **Chrome / Edge**
+- Serial / Bluetooth require **HTTPS or localhost** (browser security)
+- **WebSocket mode needs local deployment**: HTTPS pages can only connect to secure wss://. To connect to a plain ws:// local/LAN service, run this tool on **localhost** (`npm run dev`, or serve `dist/` after `npm run build`)
+- Recommended browsers: **Chrome / Edge**
