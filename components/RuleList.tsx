@@ -298,7 +298,7 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs }) => {
   // 颜色选择模态框：当前编辑的规则与颜色
   const pickerRule = pickerState ? rules.find(r => r.id === pickerState.ruleId) : null;
   const pickerColor = pickerState && pickerRule
-    ? (pickerState.target === 'color' ? pickerRule.color : (pickerRule.bgColor || '#f6e05e'))
+    ? (pickerState.target === 'color' ? (pickerRule.color || '#000000') : (pickerRule.bgColor || '#f6e05e'))
     : '#f6e05e';
   const applyPickerColor = (color: string) => {
     if (!pickerState) return;
@@ -320,6 +320,33 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs }) => {
     setHexDraft(val);
     const normalized = normalizeHex(val);
     if (normalized) applyPickerColor(normalized);
+  };
+
+  // 双击颜色按钮：对调文字色与背景色
+  const swapRuleColors = (ruleId: string) => {
+    const rule = rules.find(r => r.id === ruleId);
+    if (!rule) return;
+    updateRule(ruleId, {
+      color: rule.bgColor || '',   // 背景色为空时文字色同步清空（真正的对调）
+      bgColor: rule.color
+    });
+  };
+
+  // 单击延迟打开取色模态框；双击时不打开（仅对调），避免误弹
+  const colorClickTimerRef = useRef<number | null>(null);
+  const onColorClick = (ruleId: string, target: 'color' | 'bgColor') => {
+    if (colorClickTimerRef.current) window.clearTimeout(colorClickTimerRef.current);
+    colorClickTimerRef.current = window.setTimeout(() => {
+      setPickerState({ ruleId, target });
+      colorClickTimerRef.current = null;
+    }, 250);
+  };
+  const onColorDoubleClick = (ruleId: string) => {
+    if (colorClickTimerRef.current) {
+      window.clearTimeout(colorClickTimerRef.current);
+      colorClickTimerRef.current = null;
+    }
+    swapRuleColors(ruleId);
   };
 
   return (
@@ -362,18 +389,20 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs }) => {
                   title={rule.enabled !== false ? '点击停用该规则（不染色不提取）' : '点击启用该规则'}
                   className="w-3.5 h-3.5 accent-blue-600 cursor-pointer shrink-0"
                 />
-                {/* 文字颜色：点击弹出色板模态框 */}
+                {/* 文字颜色：单击取色，双击与背景色对调 */}
                 <button
-                  onClick={() => setPickerState({ ruleId: rule.id, target: 'color' })}
-                  title="文字颜色"
+                  onClick={() => onColorClick(rule.id, 'color')}
+                  onDoubleClick={() => onColorDoubleClick(rule.id)}
+                  title={'文字颜色\n单击取色，双击与背景色对调'}
                   className="w-6 h-6 rounded cursor-pointer border border-black/10 shrink-0"
                   style={{ backgroundColor: rule.color }}
                 />
                 {/* 背景色（可选）：点击弹出色板模态框，未设置时置灰，设置后右上角出现小叉可清除 */}
                 <div className="relative shrink-0">
                   <button
-                    onClick={() => setPickerState({ ruleId: rule.id, target: 'bgColor' })}
-                    title={rule.bgColor ? `背景色 ${rule.bgColor}（点右上角 × 清除）` : '背景色（可选）'}
+                    onClick={() => onColorClick(rule.id, 'bgColor')}
+                    onDoubleClick={() => onColorDoubleClick(rule.id)}
+                    title={rule.bgColor ? `背景色 ${rule.bgColor}\n单击取色，双击与文字色对调` : '背景色（可选）\n单击取色，双击与文字色对调'}
                     className="block w-6 h-6 rounded cursor-pointer border border-black/10 shrink-0"
                     style={rule.bgColor ? { backgroundColor: rule.bgColor } : { opacity: 0.35, filter: 'grayscale(1)', backgroundColor: '#f6e05e' }}
                   />
