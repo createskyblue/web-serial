@@ -1144,8 +1144,8 @@ const App: React.FC = () => {
     if (!isDraggingLeftSidebar) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      const newWidth = Math.max(200, Math.min(500, e.clientX));
-      setLeftSidebarWidth(newWidth);
+      // 不限制拖拽宽度（下限保留细条宽度，避免拖到不可见），不自动折叠
+      setLeftSidebarWidth(Math.max(36, e.clientX));
     };
 
     const handleMouseUp = () => {
@@ -1169,8 +1169,8 @@ const App: React.FC = () => {
     if (!isDraggingRightSidebar) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      const newWidth = Math.max(200, Math.min(500, window.innerWidth - e.clientX));
-      setRightSidebarWidth(newWidth);
+      // 不限制拖拽宽度（下限保留细条宽度，避免拖到不可见），不自动折叠
+      setRightSidebarWidth(Math.max(36, window.innerWidth - e.clientX));
     };
 
     const handleMouseUp = () => {
@@ -1375,7 +1375,7 @@ const App: React.FC = () => {
         ></div>
         
 
-        <div className="bg-white shadow-sm m-2 mb-2 transition-all duration-200 select-none" style={isSenderCollapsed ? { height: '36px' } : { height: `${100 - splitPosition}%`, minHeight: '80px' }}>
+        <div className={`bg-white shadow-sm m-2 mb-2 select-none ${isDragging ? '' : 'transition-all duration-200'}`} style={isSenderCollapsed ? { height: '36px' } : { height: `${100 - splitPosition}%`, minHeight: '80px' }}>
           <Sender onSend={sendData} onFileSend={handleFileSend} isConnected={isConnected && !isPaused} isReconnecting={isReconnecting} isCollapsed={isSenderCollapsed} onToggleCollapse={() => setIsSenderCollapsed(prev => !prev)} />
         </div>
       </main>
