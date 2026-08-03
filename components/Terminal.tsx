@@ -159,14 +159,13 @@ interface TerminalProps {
   /** 用户从历史区域滚回底部时触发（用于卸载已加载的旧渲染区域） */
   onReachedBottom?: () => void;
   rules?: Rule[];
-  colorVersion?: number;
 }
 
 const Terminal: React.FC<TerminalProps> = ({
   logs, displayMode, isGroupByTimeout, isShowTimestamp, terminalEndRef,
   lineFrequency, totalRxBytes = 0, totalTxBytes = 0,
   totalLogCount, hasMoreChunks = false, hiddenChunksCount = 0, onLoadMore, onReachedBottom,
-  rules = [], colorVersion = 0
+  rules = []
 }) => {
   // 染色缓存（跨条目：拼接所有日志文本后统一匹配，再按每条日志切回）
   const coloredLogs = useMemo(() => {
@@ -209,7 +208,7 @@ const Terminal: React.FC<TerminalProps> = ({
       logStart = logEnd;
     }
     return result;
-  }, [logs, rules, colorVersion]);
+  }, [logs, rules]);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const prevScrollHeightRef = useRef(0);

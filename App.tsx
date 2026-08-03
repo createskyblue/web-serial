@@ -197,7 +197,6 @@ const App: React.FC = () => {
     }
     return [];
   });
-  const [colorVersion, setColorVersion] = useState(0);
 
   const [quickSendItems, setQuickSendItems] = useState<QuickSendItem[]>(() => {
     const saved = localStorage.getItem('quick_send_list');
@@ -1363,7 +1362,6 @@ const App: React.FC = () => {
               onLoadMore={loadMoreChunks}
               onReachedBottom={handleReachedBottom}
               rules={rules}
-              colorVersion={colorVersion}
             />
           </div>
         </div>
@@ -1437,7 +1435,6 @@ const App: React.FC = () => {
                 rules={rules}
                 onUpdate={setRules}
                 logs={displayLogs}
-                onRefreshAll={() => setColorVersion(v => v + 1)}
               />
             )}
           </aside>

@@ -6,7 +6,6 @@ interface RuleListProps {
   rules: Rule[];
   onUpdate: (rules: Rule[]) => void;
   logs: LogEntry[];
-  onRefreshAll: () => void;
 }
 
 interface MatchResult {
@@ -73,7 +72,7 @@ function extractLastMatch(
   return lastMatch;
 }
 
-const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs, onRefreshAll }) => {
+const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs }) => {
   // 拼接所有 RX/TX 日志文本（只取最近 1KB）+ 构建位置→时间戳映射
   const scanData = useMemo(() => {
     const filtered = logs.filter(l => l.type === 'rx' || l.type === 'tx');
@@ -393,12 +392,6 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs, onRefreshAll
           className="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-xs text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
         >
           <i className="fas fa-plus mr-1"></i>添加规则
-        </button>
-        <button
-          onClick={onRefreshAll}
-          className="w-full py-1.5 bg-gray-100 hover:bg-gray-200 rounded text-[10px] text-gray-600 transition-colors"
-        >
-          <i className="fas fa-sync-alt mr-1"></i>全局刷新染色
         </button>
       </div>
     </div>
