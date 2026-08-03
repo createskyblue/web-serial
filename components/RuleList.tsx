@@ -1,6 +1,13 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { Rule, DisplayMode, LogEntry } from '../types';
 import { hexToUint8Array, uint8ArrayToString, uint8ArrayToHex, stringToUint8Array } from '../utils/converters';
+import HsvPicker from './HsvPicker';
+
+/** 预置色板（多巴胺彩色 + 黑/白，参考 Tailwind 色系）：点击设为文字/背景色 */
+const PRESET_COLORS = [
+  '#000000', '#ffffff',
+  '#ef4444', '#f97316', '#f59e0b', '#22c55e', '#06b6d4', '#3b82f6', '#a855f7', '#ec4899'
+];
 
 interface RuleListProps {
   rules: Rule[];
@@ -164,6 +171,8 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs }) => {
   const listRef = useRef<HTMLDivElement>(null);
   const dragIndexRef = useRef<number | null>(null);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+  // 颜色选择模态框状态：正在编辑的规则 + 目标（文字色/背景色）
+  const [pickerState, setPickerState] = useState<{ ruleId: string; target: 'color' | 'bgColor' } | null>(null);
   // 用 ref 保存最新值，避免 mousemove 监听器重复注册
   const rulesRef = useRef(rules);
   rulesRef.current = rules;
@@ -286,6 +295,33 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs }) => {
     return text.replace(/\r\n/g, '\n').replace(/\r/g, '');
   };
 
+  // 颜色选择模态框：当前编辑的规则与颜色
+  const pickerRule = pickerState ? rules.find(r => r.id === pickerState.ruleId) : null;
+  const pickerColor = pickerState && pickerRule
+    ? (pickerState.target === 'color' ? pickerRule.color : (pickerRule.bgColor || '#f6e05e'))
+    : '#f6e05e';
+  const applyPickerColor = (color: string) => {
+    if (!pickerState) return;
+    updateRule(pickerState.ruleId, { [pickerState.target]: color } as Partial<Rule>);
+  };
+
+  // HEX 直接输入：草稿跟随当前颜色，输入合法时实时应用
+  const [hexDraft, setHexDraft] = useState('');
+  useEffect(() => {
+    setHexDraft(pickerColor);
+  }, [pickerColor]);
+  const normalizeHex = (val: string): string | null => {
+    let v = val.trim().replace(/^#/, '');
+    if (/^[0-9a-fA-F]{3}$/.test(v)) v = v.split('').map(c => c + c).join('');
+    if (/^[0-9a-fA-F]{6}$/.test(v)) return '#' + v.toLowerCase();
+    return null;
+  };
+  const onHexChange = (val: string) => {
+    setHexDraft(val);
+    const normalized = normalizeHex(val);
+    if (normalized) applyPickerColor(normalized);
+  };
+
   return (
     <div className="flex-1 flex flex-col min-h-0">
       <div ref={listRef} className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
@@ -326,22 +362,20 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs }) => {
                   title={rule.enabled !== false ? '点击停用该规则（不染色不提取）' : '点击启用该规则'}
                   className="w-3.5 h-3.5 accent-blue-600 cursor-pointer shrink-0"
                 />
-                <input
-                  type="color"
-                  value={rule.color}
-                  onChange={(e) => updateRule(rule.id, { color: e.target.value })}
+                {/* 文字颜色：点击弹出色板模态框 */}
+                <button
+                  onClick={() => setPickerState({ ruleId: rule.id, target: 'color' })}
                   title="文字颜色"
-                  className="w-6 h-6 rounded cursor-pointer border-0 p-0 shrink-0"
+                  className="w-6 h-6 rounded cursor-pointer border border-black/10 shrink-0"
+                  style={{ backgroundColor: rule.color }}
                 />
-                {/* 背景色（可选）：未设置时置灰，设置后右上角出现小叉可清除 */}
+                {/* 背景色（可选）：点击弹出色板模态框，未设置时置灰，设置后右上角出现小叉可清除 */}
                 <div className="relative shrink-0">
-                  <input
-                    type="color"
-                    value={rule.bgColor || '#f6e05e'}
-                    onChange={(e) => updateRule(rule.id, { bgColor: e.target.value })}
+                  <button
+                    onClick={() => setPickerState({ ruleId: rule.id, target: 'bgColor' })}
                     title={rule.bgColor ? `背景色 ${rule.bgColor}（点右上角 × 清除）` : '背景色（可选）'}
-                    className="w-6 h-6 rounded cursor-pointer border-0 p-0 shrink-0"
-                    style={rule.bgColor ? undefined : { opacity: 0.35, filter: 'grayscale(1)' }}
+                    className="block w-6 h-6 rounded cursor-pointer border border-black/10 shrink-0"
+                    style={rule.bgColor ? { backgroundColor: rule.bgColor } : { opacity: 0.35, filter: 'grayscale(1)', backgroundColor: '#f6e05e' }}
                   />
                   {rule.bgColor && (
                     <span
@@ -409,6 +443,63 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs }) => {
           <i className="fas fa-plus mr-1"></i>添加规则
         </button>
       </div>
+
+      {/* 颜色选择模态框：预置色板 + HSV 取色器 */}
+      {pickerState && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+          onClick={() => setPickerState(null)}
+        >
+          <div className="bg-white rounded-xl shadow-2xl p-4 w-72" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-bold text-gray-700">
+                {pickerState.target === 'color' ? '选择文字颜色' : '选择背景颜色'}
+              </h3>
+              <button onClick={() => setPickerState(null)} className="text-gray-400 hover:text-gray-600" title="关闭">
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {PRESET_COLORS.map(c => (
+                <button
+                  key={c}
+                  onClick={() => applyPickerColor(c)}
+                  title={c}
+                  className={`w-7 h-7 rounded-full shrink-0 cursor-pointer transition-transform hover:scale-110 ${pickerColor.toLowerCase() === c ? 'ring-2 ring-offset-1 ring-gray-500' : 'border border-black/10'}`}
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+            </div>
+            <HsvPicker color={pickerColor} onChange={applyPickerColor} />
+            <div className="flex items-center gap-2 border-t border-gray-100 mt-3 pt-2">
+              {/* 颜色预览 */}
+              <div
+                className="w-8 h-8 rounded-lg border border-black/10 shrink-0 shadow-inner"
+                style={{ backgroundColor: pickerColor }}
+              />
+              <input
+                type="text"
+                value={hexDraft}
+                onChange={(e) => onHexChange(e.target.value)}
+                onBlur={() => setHexDraft(pickerColor)}
+                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                spellCheck={false}
+                className="flex-1 min-w-0 px-1.5 py-1 text-xs font-mono text-gray-600 border border-gray-300 rounded outline-none focus:ring-1 focus:ring-blue-500"
+                placeholder="#RRGGBB"
+                title="直接输入十六进制颜色值（#ff0000 / ff0000 / #f00 均可，输入合法即生效）"
+              />
+              {pickerState.target === 'bgColor' && (
+                <button
+                  onClick={() => applyPickerColor('')}
+                  className="text-[10px] text-gray-400 hover:text-red-500"
+                >
+                  清除背景色
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
