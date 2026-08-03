@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { SerialConfig, DataBits, StopBits, Parity, CommMode } from '../types';
+import { SerialConfig, DataBits, StopBits, Parity, CommMode, Rule, QuickSendItem } from '../types';
 
 interface SerialPort {
   readonly readable: ReadableStream<Uint8Array> | null;
@@ -38,6 +38,11 @@ interface SidebarProps {
   setBluetoothTxCharacteristicUUID: (val: string) => void;
   bluetoothRxCharacteristicUUID: string;
   setBluetoothRxCharacteristicUUID: (val: string) => void;
+  // 右侧栏配置（染色&提取规则、快捷发送项），供导入/导出使用
+  rules: Rule[];
+  setRules: React.Dispatch<React.SetStateAction<Rule[]>>;
+  quickSendItems: QuickSendItem[];
+  setQuickSendItems: React.Dispatch<React.SetStateAction<QuickSendItem[]>>;
   onConnect: () => void;
   onDisconnect: () => void;
   isReconnecting?: boolean;
@@ -139,6 +144,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   setBluetoothTxCharacteristicUUID,
   bluetoothRxCharacteristicUUID,
   setBluetoothRxCharacteristicUUID,
+  rules,
+  setRules,
+  quickSendItems,
+  setQuickSendItems,
   onConnect,
   onDisconnect,
   isReconnecting = false,
@@ -483,7 +492,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                     max_buffer_size: maxBufferSize,
                     is_group_by_timeout: isGroupByTimeout,
                     group_timeout_ms: groupTimeoutMs,
-                    is_show_timestamp: isShowTimestamp
+                    is_show_timestamp: isShowTimestamp,
+                    rules,
+                    quick_send_items: quickSendItems
                   };
                   const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
                   const url = URL.createObjectURL(blob);
@@ -523,6 +534,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                       if (json.is_group_by_timeout !== undefined) setIsGroupByTimeout(json.is_group_by_timeout);
                       if (json.group_timeout_ms) setGroupTimeoutMs(json.group_timeout_ms);
                       if (json.is_show_timestamp !== undefined) setIsShowTimestamp(json.is_show_timestamp);
+                      if (json.rules) setRules(json.rules);
+                      if (json.quick_send_items) setQuickSendItems(json.quick_send_items);
                     } catch {
                       alert('无效的配置文件');
                     }

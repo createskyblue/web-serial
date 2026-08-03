@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useCallback, useState, useMemo } from 'react';
-import { LogEntry, DisplayMode, ColorRule } from '../types';
+import { LogEntry, DisplayMode, Rule } from '../types';
 import { hexToUint8Array, uint8ArrayToString } from '../utils/converters';
 
 interface ColorSegment {
@@ -7,7 +7,7 @@ interface ColorSegment {
   color?: string;
 }
 
-function highlightText(text: string, data: Uint8Array, rules: ColorRule[]): ColorSegment[] {
+function highlightText(text: string, data: Uint8Array, rules: Rule[]): ColorSegment[] {
   if (!rules.length) return [{ text }];
 
   // 收集所有匹配区间
@@ -35,7 +35,6 @@ function highlightText(text: string, data: Uint8Array, rules: ColorRule[]): Colo
     };
 
     const leftText = keyToText(rule.leftKey, rule.leftKeyMode);
-    const contentText = keyToText(rule.content, rule.contentMode);
     const rightText = keyToText(rule.rightKey, rule.rightKeyMode);
 
     // 区间模式：left + right 均非空
@@ -54,17 +53,15 @@ function highlightText(text: string, data: Uint8Array, rules: ColorRule[]): Colo
         });
         searchFrom = rightIdx + rightText.length;
       }
-    }
-
-    // 关键字模式：仅 content 非空
-    if (contentText) {
+    } else if (leftText) {
+      // 关键词模式：仅填起始（结束留空），按 left 作为关键词染色
       let searchFrom = 0;
       while (searchFrom < text.length) {
-        const idx = text.indexOf(contentText, searchFrom);
+        const idx = text.indexOf(leftText, searchFrom);
         if (idx === -1) break;
         intervals.push({
           start: idx,
-          end: idx + contentText.length,
+          end: idx + leftText.length,
           color: rule.color,
           priority: ri
         });
@@ -155,7 +152,7 @@ interface TerminalProps {
   hasMoreChunks?: boolean;
   hiddenChunksCount?: number;
   onLoadMore?: () => void;
-  colorRules?: ColorRule[];
+  rules?: Rule[];
   colorVersion?: number;
 }
 
@@ -163,15 +160,15 @@ const Terminal: React.FC<TerminalProps> = ({
   logs, displayMode, isGroupByTimeout, isShowTimestamp, terminalEndRef,
   lineFrequency, totalRxBytes = 0, totalTxBytes = 0,
   totalLogCount, hasMoreChunks = false, hiddenChunksCount = 0, onLoadMore,
-  colorRules = [], colorVersion = 0
+  rules = [], colorVersion = 0
 }) => {
   // 染色缓存
   const coloredLogs = useMemo(() => {
     return logs.map(log => ({
       log,
-      segments: colorRules.length > 0 ? highlightText(log.text, log.data, colorRules) : [{ text: log.text } as ColorSegment]
+      segments: rules.length > 0 ? highlightText(log.text, log.data, rules) : [{ text: log.text } as ColorSegment]
     }));
-  }, [logs, colorRules, colorVersion]);
+  }, [logs, rules, colorVersion]);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const prevScrollHeightRef = useRef(0);

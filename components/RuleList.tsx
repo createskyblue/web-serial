@@ -1,11 +1,12 @@
-import React, { useMemo } from 'react';
-import { ExtractRule, DisplayMode, LogEntry } from '../types';
+import React, { useMemo, useRef } from 'react';
+import { Rule, DisplayMode, LogEntry } from '../types';
 import { hexToUint8Array, uint8ArrayToString, uint8ArrayToHex } from '../utils/converters';
 
-interface ExtractRuleListProps {
-  rules: ExtractRule[];
-  onUpdate: (rules: ExtractRule[]) => void;
+interface RuleListProps {
+  rules: Rule[];
+  onUpdate: (rules: Rule[]) => void;
   logs: LogEntry[];
+  onRefreshAll: () => void;
 }
 
 interface MatchResult {
@@ -13,8 +14,20 @@ interface MatchResult {
   timestamp: Date;
 }
 
-/** 在文本中查找最后（最近）一次 leftKey...rightKey 区间，返回匹配文本和时间戳 */
-function extractLastRange(
+/** 将 key 转换为可搜索文本（Hex 模式先转换） */
+function keyToText(key: string, mode: DisplayMode): string {
+  if (!key) return '';
+  if (mode === DisplayMode.Hex) {
+    try {
+      const bytes = hexToUint8Array(key);
+      return uint8ArrayToString(bytes);
+    } catch { return ''; }
+  }
+  return key;
+}
+
+/** 查找最后一次匹配：区间模式（起始..结束）或关键词模式（仅起始） */
+function extractLastMatch(
   text: string,
   getTimestamp: (posInTrimmed: number) => Date | null,
   leftKey: string,
@@ -22,56 +35,57 @@ function extractLastRange(
   rightKey: string,
   rightMode: DisplayMode
 ): MatchResult | null {
-  const keyToText = (key: string, mode: DisplayMode): string => {
-    if (!key) return '';
-    if (mode === DisplayMode.Hex) {
-      try {
-        const bytes = hexToUint8Array(key);
-        return uint8ArrayToString(bytes);
-      } catch { return ''; }
-    }
-    return key;
-  };
-
   const leftText = keyToText(leftKey, leftMode);
-  const rightText = keyToText(rightKey, rightMode);
+  if (!leftText) return null;
+  const rightText = rightKey ? keyToText(rightKey, rightMode) : '';
 
-  if (!leftText || !rightText) return null;
-
-  // 正向扫描：每个 left 配对它最近的 right，取最后一段完整匹配（与染色逻辑一致）
   let lastMatch: MatchResult | null = null;
   let searchFrom = 0;
 
-  while (searchFrom < text.length) {
-    const leftIdx = text.indexOf(leftText, searchFrom);
-    if (leftIdx === -1) break;
-    const rightIdx = text.indexOf(rightText, leftIdx + leftText.length);
-    if (rightIdx === -1) break;
-    const endPos = rightIdx + rightText.length - 1;
-    const ts = getTimestamp(endPos);
-    lastMatch = {
-      text: text.slice(leftIdx, rightIdx + rightText.length),
-      timestamp: ts ?? new Date()
-    };
-    searchFrom = rightIdx + rightText.length;
+  if (leftText && rightText) {
+    // 区间模式：每个 left 配对它最近的 right，取最后一段完整匹配
+    while (searchFrom < text.length) {
+      const leftIdx = text.indexOf(leftText, searchFrom);
+      if (leftIdx === -1) break;
+      const rightIdx = text.indexOf(rightText, leftIdx + leftText.length);
+      if (rightIdx === -1) break;
+      const endPos = rightIdx + rightText.length - 1;
+      lastMatch = {
+        text: text.slice(leftIdx, rightIdx + rightText.length),
+        timestamp: getTimestamp(endPos) ?? new Date()
+      };
+      searchFrom = rightIdx + rightText.length;
+    }
+  } else {
+    // 关键词模式：仅匹配起始字段
+    while (searchFrom < text.length) {
+      const idx = text.indexOf(leftText, searchFrom);
+      if (idx === -1) break;
+      const endPos = idx + leftText.length - 1;
+      lastMatch = {
+        text: leftText,
+        timestamp: getTimestamp(endPos) ?? new Date()
+      };
+      searchFrom = idx + leftText.length;
+    }
   }
 
   return lastMatch;
 }
 
-const ExtractRuleList: React.FC<ExtractRuleListProps> = ({ rules, onUpdate, logs }) => {
+const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs, onRefreshAll }) => {
   // 拼接所有 RX/TX 日志文本（只取最近 1KB）+ 构建位置→时间戳映射
   const scanData = useMemo(() => {
     const filtered = logs.filter(l => l.type === 'rx' || l.type === 'tx');
     if (filtered.length === 0) {
       return {
         text: '',
+        hasData: false,
         getTimestamp: (_pos: number) => null as Date | null
       };
     }
 
     const parts: string[] = [];
-    // offsets[i] = 累计字符数（含第 i 条日志的文本）
     const offsets: { upTo: number; ts: Date }[] = [];
     let total = 0;
     for (const log of filtered) {
@@ -92,25 +106,58 @@ const ExtractRuleList: React.FC<ExtractRuleListProps> = ({ rules, onUpdate, logs
       return null;
     };
 
-    return { text, getTimestamp };
+    return { text, hasData: true, getTimestamp };
   }, [logs]);
 
-  // 计算每条规则的提取结果
+  // 每条规则最近一次命中的锁存（匹配结果不因新数据挤出扫描窗口而丢失）
+  const latchedRef = useRef<Record<string, MatchResult>>({});
+  // 记录每条规则上次的区间字段签名，字段被编辑时清除旧锁存
+  const ruleSigRef = useRef<Record<string, string>>({});
+
+  // 计算每条规则的提取结果（未命中但数据仍在时保留锁存）
   const extractedResults = useMemo(() => {
-    return rules.map(rule => ({
-      ruleId: rule.id,
-      match: extractLastRange(
+    const latched = latchedRef.current;
+    const sigs = ruleSigRef.current;
+
+    const results = rules.map(rule => {
+      const sig = `${rule.leftKeyMode}|${rule.leftKey}|${rule.rightKeyMode}|${rule.rightKey}`;
+      if (sigs[rule.id] !== sig) {
+        delete latched[rule.id]; // 规则字段变化 → 旧锁存失效
+        sigs[rule.id] = sig;
+      }
+
+      const current = extractLastMatch(
         scanData.text,
         scanData.getTimestamp,
         rule.leftKey, rule.leftKeyMode,
         rule.rightKey, rule.rightKeyMode
-      )
-    }));
+      );
+
+      if (current) {
+        latched[rule.id] = current; // 命中 → 更新并锁存
+      } else if (!scanData.hasData) {
+        delete latched[rule.id]; // 日志被清空 → 清除锁存
+      }
+      // 未命中但数据仍在（如匹配文本被挤出1KB窗口）→ 保留上次锁存
+
+      return { ruleId: rule.id, match: latched[rule.id] ?? null };
+    });
+
+    // 清理已删除规则留下的锁存
+    for (const id of Object.keys(latched)) {
+      if (!rules.some(r => r.id === id)) delete latched[id];
+    }
+    for (const id of Object.keys(sigs)) {
+      if (!rules.some(r => r.id === id)) delete sigs[id];
+    }
+
+    return results;
   }, [rules, scanData]);
 
   const addRule = () => {
-    const newRule: ExtractRule = {
+    const newRule: Rule = {
       id: Math.random().toString(36).substr(2, 9),
+      color: '#e53e3e',
       leftKey: '',
       leftKeyMode: DisplayMode.Text,
       rightKey: '',
@@ -124,7 +171,7 @@ const ExtractRuleList: React.FC<ExtractRuleListProps> = ({ rules, onUpdate, logs
     onUpdate(rules.filter(r => r.id !== id));
   };
 
-  const updateRule = (id: string, updates: Partial<ExtractRule>) => {
+  const updateRule = (id: string, updates: Partial<Rule>) => {
     onUpdate(rules.map(r => r.id === id ? { ...r, ...updates } : r));
   };
 
@@ -152,8 +199,8 @@ const ExtractRuleList: React.FC<ExtractRuleListProps> = ({ rules, onUpdate, logs
       <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
         {rules.length === 0 && (
           <div className="text-center text-gray-400 text-xs py-8">
-            <i className="fas fa-cut text-2xl opacity-20 mb-2 block"></i>
-            暂无提取规则，点击下方按钮添加
+            <i className="fas fa-palette text-2xl opacity-20 mb-2 block"></i>
+            暂无规则，点击下方按钮添加
           </div>
         )}
 
@@ -162,16 +209,24 @@ const ExtractRuleList: React.FC<ExtractRuleListProps> = ({ rules, onUpdate, logs
           const match = result?.match ?? null;
           const displayText = formatDisplayText(match?.text ?? null, rule.displayMode);
           const hasMatch = match !== null;
+          const isKeywordMode = !!rule.leftKey && !rule.rightKey;
 
           return (
             <div key={rule.id} className="p-2 bg-gray-50 rounded-lg border border-gray-200 space-y-1.5">
-              {/* 行1: 输入框 + 删除 */}
+              {/* 行1: 颜色 + 起始 + 结束 + 删除 */}
               <div className="flex items-center gap-1.5">
+                <input
+                  type="color"
+                  value={rule.color}
+                  onChange={(e) => updateRule(rule.id, { color: e.target.value })}
+                  className="w-6 h-6 rounded cursor-pointer border-0 p-0 shrink-0"
+                />
                 <input
                   type="text"
                   value={rule.leftKey}
                   onChange={(e) => updateRule(rule.id, { leftKey: e.target.value })}
-                  placeholder="起始"
+                  placeholder="起始/关键字"
+                  title="只填起始、结束留空 = 关键词模式"
                   className="flex-1 min-w-0 px-1.5 py-1 border border-gray-300 rounded text-[10px] font-mono outline-none focus:ring-1 focus:ring-blue-500"
                 />
                 <input
@@ -179,7 +234,7 @@ const ExtractRuleList: React.FC<ExtractRuleListProps> = ({ rules, onUpdate, logs
                   value={rule.rightKey}
                   onChange={(e) => updateRule(rule.id, { rightKey: e.target.value })}
                   placeholder="结束"
-                  title={"别忘了切换 HEX 模式：\n\\r 回车 = 0D\n\\n 换行 = 0A"}
+                  title={"只填起始=关键词模式；\n区间模式切换 HEX：\n\\r 回车 = 0D\n\\n 换行 = 0A"}
                   className="flex-1 min-w-0 px-1.5 py-1 border border-gray-300 rounded text-[10px] font-mono outline-none focus:ring-1 focus:ring-blue-500"
                 />
                 <button
@@ -189,13 +244,16 @@ const ExtractRuleList: React.FC<ExtractRuleListProps> = ({ rules, onUpdate, logs
                   <i className="fas fa-times text-[10px]"></i>
                 </button>
               </div>
-              {/* 行2: mode toggles + 时间戳 */}
+              {/* 行2: mode toggles + 模式标签 + 显示模式 */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <ModeToggle mode={rule.leftKeyMode} onChange={(m) => updateRule(rule.id, { leftKeyMode: m })} />
-                  <ModeToggle mode={rule.rightKeyMode} onChange={(m) => updateRule(rule.id, { rightKeyMode: m })} />
-                  <span className="text-[9px] text-gray-400 mx-1">|</span>
-                  <span className="text-[9px] text-gray-400">显示:</span>
+                  {!isKeywordMode && <ModeToggle mode={rule.rightKeyMode} onChange={(m) => updateRule(rule.id, { rightKeyMode: m })} />}
+                  <span className={`text-[9px] font-bold ${isKeywordMode ? 'text-amber-600' : 'text-gray-400'}`}>
+                    {isKeywordMode ? '关键词' : '区间'}
+                  </span>
+                  <span className="text-[9px] text-gray-400 mx-0.5">|</span>
+                  <span className="text-[9px] text-gray-400">提取:</span>
                   <ModeToggle mode={rule.displayMode} onChange={(m) => updateRule(rule.id, { displayMode: m })} />
                 </div>
                 {hasMatch && (
@@ -215,16 +273,22 @@ const ExtractRuleList: React.FC<ExtractRuleListProps> = ({ rules, onUpdate, logs
         })}
       </div>
 
-      <div className="p-3 border-t">
+      <div className="p-3 border-t space-y-2">
         <button
           onClick={addRule}
           className="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-xs text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
         >
-          <i className="fas fa-plus mr-1"></i>添加提取规则
+          <i className="fas fa-plus mr-1"></i>添加规则
+        </button>
+        <button
+          onClick={onRefreshAll}
+          className="w-full py-1.5 bg-gray-100 hover:bg-gray-200 rounded text-[10px] text-gray-600 transition-colors"
+        >
+          <i className="fas fa-sync-alt mr-1"></i>全局刷新染色
         </button>
       </div>
     </div>
   );
 };
 
-export default ExtractRuleList;
+export default RuleList;

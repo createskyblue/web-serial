@@ -63,22 +63,12 @@ export interface QuickSendItem {
   mode: DisplayMode;
 }
 
-export interface ColorRule {
+export interface Rule {
   id: string;
-  color: string;
-  leftKey: string;
+  color: string;             // 染色颜色
+  leftKey: string;           // 起始（只填起始、结束留空 = 关键词模式）
   leftKeyMode: DisplayMode;
-  content: string;
-  contentMode: DisplayMode;
-  rightKey: string;
+  rightKey: string;          // 结束（留空 = 关键词模式）
   rightKeyMode: DisplayMode;
-}
-
-export interface ExtractRule {
-  id: string;
-  leftKey: string;
-  leftKeyMode: DisplayMode;
-  rightKey: string;
-  rightKeyMode: DisplayMode;
-  displayMode: DisplayMode;
+  displayMode: DisplayMode;  // 提取结果显示模式（T/H）
 }
