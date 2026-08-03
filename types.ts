@@ -66,6 +66,7 @@ export interface QuickSendItem {
 
 export interface Rule {
   id: string;
+  enabled?: boolean;         // 是否激活（默认 true，停用后不染色不提取）
   color: string;             // 文字颜色
   bgColor?: string;          // 背景色（可选，空 = 无背景）
   leftKey: string;           // 起始（只填起始、结束留空 = 关键词模式）

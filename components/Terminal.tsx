@@ -23,6 +23,7 @@ function highlightText(text: string, data: Uint8Array, rules: Rule[]): ColorSegm
 
   for (let ri = 0; ri < rules.length; ri++) {
     const rule = rules[ri];
+    if (rule.enabled === false) continue; // 停用的规则不参与染色
 
     // 将 key 转换为可搜索的文本（Hex 模式先转换）
     const keyToText = (key: string, mode: DisplayMode): string => {

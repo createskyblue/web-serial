@@ -120,6 +120,12 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs }) => {
     const sigs = ruleSigRef.current;
 
     const results = rules.map(rule => {
+      if (rule.enabled === false) {
+        // 停用的规则：清除锁存，不参与提取
+        delete latched[rule.id];
+        delete sigs[rule.id];
+        return { ruleId: rule.id, match: null };
+      }
       const sig = `${rule.leftKeyMode}|${rule.leftKey}|${rule.rightKeyMode}|${rule.rightKey}`;
       if (sigs[rule.id] !== sig) {
         delete latched[rule.id]; // 规则字段变化 → 旧锁存失效
@@ -215,6 +221,7 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs }) => {
   const addRule = () => {
     const newRule: Rule = {
       id: Math.random().toString(36).substr(2, 9),
+      enabled: true,
       color: '#e53e3e',
       bgColor: '',
       leftKey: '',
@@ -300,7 +307,7 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs }) => {
             <div
               key={rule.id}
               data-rule-id={rule.id}
-              className={`p-2 bg-gray-50 rounded-lg border border-gray-200 space-y-1.5 transition-opacity ${draggingIndex === index ? 'opacity-50' : ''}`}
+              className={`p-2 bg-gray-50 rounded-lg border border-gray-200 space-y-1.5 transition-opacity ${draggingIndex === index ? 'opacity-50' : ''} ${rule.enabled === false ? 'opacity-60' : ''}`}
             >
               {/* 行1: 拖拽手柄 + 颜色 + 起始 + 结束 + 删除 */}
               <div className="flex items-center gap-1.5">
@@ -311,6 +318,14 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs }) => {
                 >
                   <i className="fas fa-grip-vertical text-[10px]"></i>
                 </span>
+                {/* 启用/停用开关：停用后不染色、不提取 */}
+                <input
+                  type="checkbox"
+                  checked={rule.enabled !== false}
+                  onChange={(e) => updateRule(rule.id, { enabled: e.target.checked })}
+                  title={rule.enabled !== false ? '点击停用该规则（不染色不提取）' : '点击启用该规则'}
+                  className="w-3.5 h-3.5 accent-blue-600 cursor-pointer shrink-0"
+                />
                 <input
                   type="color"
                   value={rule.color}
@@ -375,11 +390,11 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs }) => {
               {/* 行3: 提取结果显示区（只读输出框：可鼠标选中复制，右下角可拖拽调整大小） */}
               <textarea
                 readOnly
-                value={hasMatch ? displayText : '等待匹配...'}
+                value={rule.enabled === false ? '已停用' : hasMatch ? displayText : '等待匹配...'}
                 rows={2}
                 spellCheck={false}
                 title="可选中复制；拖拽右下角调整大小"
-                className={`w-full px-1.5 py-1 rounded text-[10px] font-mono min-h-[28px] resize-y overflow-auto custom-scrollbar whitespace-pre-wrap break-all border outline-none ${hasMatch ? 'bg-white border-gray-300 text-gray-800' : 'bg-gray-100 border-gray-200 text-gray-400'}`}
+                className={`w-full px-1.5 py-1 rounded text-[10px] font-mono min-h-[28px] resize-y overflow-auto custom-scrollbar whitespace-pre-wrap break-all border outline-none ${rule.enabled === false ? 'bg-gray-100 border-gray-200 text-gray-400' : hasMatch ? 'bg-white border-gray-300 text-gray-800' : 'bg-gray-100 border-gray-200 text-gray-400'}`}
               />
             </div>
           );
