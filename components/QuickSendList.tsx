@@ -25,6 +25,7 @@ const QuickSendList: React.FC<QuickSendListProps> = ({ items, onSend, onUpdate, 
       mode: DisplayMode.Text
     };
     onUpdate([...items, newItem]);
+    setExpandedId(newItem.id); // 新指令自动展开，便于直接编辑内容
   };
 
   const removeItem = (id: string) => {
@@ -56,6 +57,7 @@ const QuickSendList: React.FC<QuickSendListProps> = ({ items, onSend, onUpdate, 
   const listRef = useRef<HTMLDivElement>(null);
   const dragIndexRef = useRef<number | null>(null);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null); // 当前展开编辑的指令
   // 用 ref 保存最新值，避免 mousemove 监听器重复注册
   const itemsRef = useRef(items);
   itemsRef.current = items;
@@ -187,58 +189,79 @@ const QuickSendList: React.FC<QuickSendListProps> = ({ items, onSend, onUpdate, 
             暂无快捷指令
           </div>
         )}
-        {items.map((item, index) => (
-          <div key={item.id} data-item-id={item.id} className={`p-3 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-200 transition-colors group ${draggingIndex === index ? 'opacity-50' : ''}`}>
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span
-                  onMouseDown={(e) => onHandleMouseDown(e, index)}
-                  title="拖拽调整顺序"
-                  className="cursor-grab text-gray-400 hover:text-blue-500 select-none active:cursor-grabbing shrink-0"
-                >
-                  <i className="fas fa-grip-vertical text-[10px]"></i>
-                </span>
+        {items.map((item, index) => {
+          const expanded = expandedId === item.id;
+          return (
+          <div key={item.id} data-item-id={item.id} className={`p-2 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-200 transition-colors ${draggingIndex === index ? 'opacity-50' : ''}`}>
+            {/* 收起态：全部在一行（手柄 + 标题 + 内容 + 模式 + 发送 + 展开） */}
+            <div className="flex items-center gap-1.5">
+              <span
+                onMouseDown={(e) => onHandleMouseDown(e, index)}
+                title="拖拽调整顺序"
+                className="cursor-grab text-gray-400 hover:text-blue-500 select-none active:cursor-grabbing shrink-0"
+              >
+                <i className="fas fa-grip-vertical text-[10px]"></i>
+              </span>
+              <input
+                value={item.label}
+                onChange={(e) => updateItem(item.id, { label: e.target.value })}
+                size={Math.max(item.label.length, 2)}
+                className="shrink min-w-0 truncate h-6 bg-transparent focus:bg-white text-[11px] font-bold text-gray-600 focus:outline-none focus:text-blue-600 rounded px-0.5"
+                placeholder="名称"
+              />
+              {!expanded && (
                 <input
-                  value={item.label}
-                  onChange={(e) => updateItem(item.id, { label: e.target.value })}
-                  className="bg-transparent text-[11px] font-bold text-gray-600 focus:outline-none focus:text-blue-600 w-2/3"
-                  placeholder="指令名称"
+                  value={item.content}
+                  onChange={(e) => updateItem(item.id, { content: e.target.value })}
+                  className="flex-1 min-w-0 truncate h-6 bg-white border border-gray-300 rounded px-1 text-[10px] font-mono text-gray-700 focus:outline-none"
+                  placeholder="内容..."
                 />
-              </div>
-              <button onClick={() => removeItem(item.id)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                <i className="fas fa-times-circle text-xs"></i>
-              </button>
-            </div>
-
-            <textarea
-              value={item.content}
-              onChange={(e) => updateItem(item.id, { content: e.target.value })}
-              className="w-full text-xs font-mono p-2 bg-white border border-gray-200 rounded mb-2 h-12 outline-none focus:border-blue-300 resize-none"
-              placeholder="内容..."
-            />
-
-            <div className="flex items-center justify-between">
-              <div className="flex bg-gray-200 p-0.5 rounded">
+              )}
+              <div className="flex bg-gray-200 p-0.5 rounded shrink-0 ml-auto">
                 <button
                   onClick={() => changeMode(item.id, DisplayMode.Text)}
-                  className={`px-2 py-0.5 text-[9px] rounded ${item.mode === DisplayMode.Text ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}
+                  className={`px-1.5 py-0.5 text-[9px] rounded ${item.mode === DisplayMode.Text ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}
                 >Text</button>
                 <button
                   onClick={() => changeMode(item.id, DisplayMode.Hex)}
-                  className={`px-2 py-0.5 text-[9px] rounded ${item.mode === DisplayMode.Hex ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}
+                  className={`px-1.5 py-0.5 text-[9px] rounded ${item.mode === DisplayMode.Hex ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}
                 >HEX</button>
               </div>
-
               <button
                 onClick={() => onSend(item.content, item.mode)}
                 disabled={(!isConnected && !isReconnecting) || !item.content}
-                className="px-4 py-1 bg-blue-500 hover:bg-blue-600 disabled:opacity-30 text-white text-[10px] font-bold rounded shadow-sm transition-colors flex items-center"
+                className="px-3 py-1 bg-blue-500 hover:bg-blue-600 disabled:opacity-30 text-white text-[10px] font-bold rounded shadow-sm transition-colors flex items-center shrink-0"
               >
                 发送
               </button>
+              <button
+                onClick={() => setExpandedId(expanded ? null : item.id)}
+                title={expanded ? '收起' : '展开编辑内容'}
+                className="text-gray-400 hover:text-blue-500 shrink-0"
+              >
+                <i className={`fas fa-chevron-${expanded ? 'up' : 'down'} text-[9px]`}></i>
+              </button>
             </div>
+
+            {/* 展开态：多行内容编辑区 + 删除 */}
+            {expanded && (
+              <div className="mt-2 space-y-1.5">
+                <textarea
+                  value={item.content}
+                  onChange={(e) => updateItem(item.id, { content: e.target.value })}
+                  className="w-full text-xs font-mono p-2 bg-white border border-gray-200 rounded h-20 resize-y outline-none focus:border-blue-300"
+                  placeholder="内容..."
+                />
+                <div className="flex justify-end">
+                  <button onClick={() => removeItem(item.id)} className="text-[10px] text-gray-400 hover:text-red-500 transition-colors">
+                    <i className="fas fa-times mr-1"></i>删除
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="p-4 border-t">
