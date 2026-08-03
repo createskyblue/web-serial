@@ -256,10 +256,13 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs, onRefreshAll
     updateRule(rule.id, { [modeField]: newMode, [field]: key } as Partial<Rule>);
   };
 
-  const ModeToggle = ({ mode, onChange }: { mode: DisplayMode; onChange: (m: DisplayMode) => void }) => (
-    <div className="flex bg-gray-200 p-0.5 rounded text-[9px] shrink-0">
-      <button onClick={() => onChange(DisplayMode.Text)} className={`px-1.5 py-0.5 rounded ${mode === DisplayMode.Text ? 'bg-white shadow-sm font-bold text-blue-600' : 'text-gray-500'}`}>T</button>
-      <button onClick={() => onChange(DisplayMode.Hex)} className={`px-1.5 py-0.5 rounded ${mode === DisplayMode.Hex ? 'bg-white shadow-sm font-bold text-blue-600' : 'text-gray-500'}`}>H</button>
+  const ModeToggle = ({ label, mode, onChange }: { label?: string; mode: DisplayMode; onChange: (m: DisplayMode) => void }) => (
+    <div className="flex items-center gap-0.5 shrink-0">
+      {label && <span className="text-[9px] text-gray-400 shrink-0">{label}:</span>}
+      <div className="flex bg-gray-200 p-0.5 rounded text-[9px]">
+        <button onClick={() => onChange(DisplayMode.Text)} className={`px-1 py-0.5 rounded ${mode === DisplayMode.Text ? 'bg-white shadow-sm font-bold text-blue-600' : 'text-gray-500'}`}>Text</button>
+        <button onClick={() => onChange(DisplayMode.Hex)} className={`px-1 py-0.5 rounded ${mode === DisplayMode.Hex ? 'bg-white shadow-sm font-bold text-blue-600' : 'text-gray-500'}`}>HEX</button>
+      </div>
     </div>
   );
 
@@ -346,8 +349,8 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs, onRefreshAll
                   type="text"
                   value={rule.rightKey}
                   onChange={(e) => updateRule(rule.id, { rightKey: e.target.value })}
-                  placeholder="结束"
-                  title={"只填起始=关键词模式；\n区间模式切换 HEX：\n\\r 回车 = 0D\n\\n 换行 = 0A"}
+                  placeholder="结束（鼠标悬浮查看提示）"
+                  title={"结束留空 = 关键词模式：\n只匹配「起始」关键字，并提取出现时间\n\n填「起始 + 结束」 = 区间模式：\n染色该区间并提取区间内容\n\n区间模式 HEX 下：\n\\r 回车 = 0D\n\\n 换行 = 0A"}
                   className="flex-1 min-w-0 px-1.5 py-1 border border-gray-300 rounded text-[10px] font-mono outline-none focus:ring-1 focus:ring-blue-500"
                 />
                 <button
@@ -358,16 +361,11 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs, onRefreshAll
                 </button>
               </div>
               {/* 行2: mode toggles + 模式标签 + 显示模式 */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <ModeToggle mode={rule.leftKeyMode} onChange={(m) => changeKeyMode(rule, 'leftKeyMode', 'leftKey', m)} />
-                  {!isKeywordMode && <ModeToggle mode={rule.rightKeyMode} onChange={(m) => changeKeyMode(rule, 'rightKeyMode', 'rightKey', m)} />}
-                  <span className={`text-[9px] font-bold ${isKeywordMode ? 'text-amber-600' : 'text-gray-400'}`}>
-                    {isKeywordMode ? '关键词' : '区间'}
-                  </span>
-                  <span className="text-[9px] text-gray-400 mx-0.5">|</span>
-                  <span className="text-[9px] text-gray-400">提取:</span>
-                  <ModeToggle mode={rule.displayMode} onChange={(m) => updateRule(rule.id, { displayMode: m })} />
+              <div className="flex items-center justify-between gap-1 flex-wrap">
+                <div className="flex items-center gap-0.5 flex-wrap">
+                  <ModeToggle label="开始" mode={rule.leftKeyMode} onChange={(m) => changeKeyMode(rule, 'leftKeyMode', 'leftKey', m)} />
+                  {!isKeywordMode && <ModeToggle label="结束" mode={rule.rightKeyMode} onChange={(m) => changeKeyMode(rule, 'rightKeyMode', 'rightKey', m)} />}
+                  <ModeToggle label="提取结果" mode={rule.displayMode} onChange={(m) => updateRule(rule.id, { displayMode: m })} />
                 </div>
                 {hasMatch && (
                   <span className="text-[9px] text-gray-400 shrink-0">
