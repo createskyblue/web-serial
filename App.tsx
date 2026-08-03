@@ -154,7 +154,8 @@ const App: React.FC = () => {
   });
   
   const [logChunks, setLogChunks] = useState<LogEntry[][]>([[]]);
-  const [visibleChunkCount, setVisibleChunkCount] = useState(2);
+  const BASE_VISIBLE_CHUNKS = 2; // 默认渲染块数（只保留最新几块，上滚时再动态加载）
+  const [visibleChunkCount, setVisibleChunkCount] = useState(BASE_VISIBLE_CHUNKS);
   const CHUNK_SIZE = 10 * 1024; // 每个块 10KB
 
   const [displayMode, setDisplayMode] = useState<DisplayMode>(DisplayMode.Text);
@@ -401,6 +402,11 @@ const App: React.FC = () => {
   // 加载更多块（用户上滚时调用）
   const loadMoreChunks = useCallback(() => {
     setVisibleChunkCount(prev => prev + 2);
+  }, []);
+
+  // 用户滚回底部 → 卸载已加载的旧区域（渲染窗口还原到默认，释放 DOM/计算开销；原始数据仍受 maxBufferSize 上限保护，上滚可再次加载）
+  const handleReachedBottom = useCallback(() => {
+    setVisibleChunkCount(prev => (prev > BASE_VISIBLE_CHUNKS ? BASE_VISIBLE_CHUNKS : prev));
   }, []);
 
   const addLog = useCallback((type: LogEntry['type'], data: Uint8Array, newText: string) => {
@@ -1215,7 +1221,7 @@ const App: React.FC = () => {
       } else if (e.key === 'c') {
         e.preventDefault();
         setLogChunks([[]]);
-        setVisibleChunkCount(2);
+        setVisibleChunkCount(BASE_VISIBLE_CHUNKS);
         setTotalRxBytes(0);
         setTotalTxBytes(0);
       } else if (e.key === 'Tab') {
@@ -1318,7 +1324,7 @@ const App: React.FC = () => {
             <button
               onClick={() => {
                 setLogChunks([[]]);
-                setVisibleChunkCount(2);
+                setVisibleChunkCount(BASE_VISIBLE_CHUNKS);
                 setTotalRxBytes(0);
                 setTotalTxBytes(0);
               }}
@@ -1359,6 +1365,7 @@ const App: React.FC = () => {
               hasMoreChunks={hasMoreChunks}
               hiddenChunksCount={hiddenChunksCount}
               onLoadMore={loadMoreChunks}
+              onReachedBottom={handleReachedBottom}
               rules={rules}
               colorVersion={colorVersion}
             />

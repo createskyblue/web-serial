@@ -152,6 +152,8 @@ interface TerminalProps {
   hasMoreChunks?: boolean;
   hiddenChunksCount?: number;
   onLoadMore?: () => void;
+  /** 用户从历史区域滚回底部时触发（用于卸载已加载的旧渲染区域） */
+  onReachedBottom?: () => void;
   rules?: Rule[];
   colorVersion?: number;
 }
@@ -159,7 +161,7 @@ interface TerminalProps {
 const Terminal: React.FC<TerminalProps> = ({
   logs, displayMode, isGroupByTimeout, isShowTimestamp, terminalEndRef,
   lineFrequency, totalRxBytes = 0, totalTxBytes = 0,
-  totalLogCount, hasMoreChunks = false, hiddenChunksCount = 0, onLoadMore,
+  totalLogCount, hasMoreChunks = false, hiddenChunksCount = 0, onLoadMore, onReachedBottom,
   rules = [], colorVersion = 0
 }) => {
   // 染色缓存（跨条目：拼接所有日志文本后统一匹配，再按每条日志切回）
@@ -210,6 +212,9 @@ const Terminal: React.FC<TerminalProps> = ({
   const isLoadingMoreRef = useRef(false);
   const isAtBottomRef = useRef(true); // 用户是否在底部
   const lastScrollTopRef = useRef(0); // 上次滚动位置，用于判断是否真正向上滚动
+  // 用 ref 保存最新回调，避免滚动监听器重复注册导致闭包过期
+  const onReachedBottomRef = useRef(onReachedBottom);
+  onReachedBottomRef.current = onReachedBottom;
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -223,8 +228,11 @@ const Terminal: React.FC<TerminalProps> = ({
     if (!el) return;
     const threshold = 50; // 距离底部50px以内视为在底部
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+    const wasAtBottom = isAtBottomRef.current;
     if (atBottom) {
       isAtBottomRef.current = true;
+      // 从历史区域滚回底部 → 通知卸载已加载的旧区域（还原渲染窗口）
+      if (!wasAtBottom) onReachedBottomRef.current?.();
     } else if (el.scrollTop < lastScrollTopRef.current) {
       // 仅当真正向上滚动（scrollTop 变小）时才解除自动滚动跟随；
       // 内容增长/延迟派发的 scroll 事件 scrollTop 未变，不会误判为离开底部
