@@ -162,12 +162,47 @@ const Terminal: React.FC<TerminalProps> = ({
   totalLogCount, hasMoreChunks = false, hiddenChunksCount = 0, onLoadMore,
   rules = [], colorVersion = 0
 }) => {
-  // 染色缓存
+  // 染色缓存（跨条目：拼接所有日志文本后统一匹配，再按每条日志切回）
   const coloredLogs = useMemo(() => {
-    return logs.map(log => ({
-      log,
-      segments: rules.length > 0 ? highlightText(log.text, log.data, rules) : [{ text: log.text } as ColorSegment]
-    }));
+    if (rules.length === 0) {
+      return logs.map(log => ({ log, segments: [{ text: log.text } as ColorSegment] }));
+    }
+
+    const texts = logs.map(l => l.text);
+    const joined = texts.join('');
+    const joinedSegments = highlightText(joined, new Uint8Array(), rules);
+
+    // 记录每个片段在 joined 中的 [start, end)
+    const segRanges: { start: number; end: number; seg: ColorSegment }[] = [];
+    let p = 0;
+    for (const seg of joinedSegments) {
+      segRanges.push({ start: p, end: p + seg.text.length, seg });
+      p += seg.text.length;
+    }
+
+    // 按每条日志切回，片段跨日志边界时自动拆分
+    const result: { log: LogEntry; segments: ColorSegment[] }[] = [];
+    let logStart = 0;
+    let si = 0;
+    for (const log of logs) {
+      const logEnd = logStart + log.text.length;
+      const segs: ColorSegment[] = [];
+      if (log.text.length > 0) {
+        while (si < segRanges.length && segRanges[si].start < logEnd) {
+          const r = segRanges[si];
+          const s = Math.max(r.start, logStart);
+          const e = Math.min(r.end, logEnd);
+          if (s < e) {
+            segs.push({ text: r.seg.text.slice(s - r.start, e - r.start), color: r.seg.color });
+          }
+          if (r.end <= logEnd) si++;
+          else break; // 该片段跨越到下一个日志，保留 si 供下一条继续切
+        }
+      }
+      result.push({ log, segments: segs });
+      logStart = logEnd;
+    }
+    return result;
   }, [logs, rules, colorVersion]);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);

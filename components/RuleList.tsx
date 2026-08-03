@@ -95,7 +95,8 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs, onRefreshAll
     }
 
     const full = parts.join('');
-    const trimAmount = full.length > 1024 ? full.length - 1024 : 0;
+    const SCAN_WINDOW = 5 * 1024; // 只扫描最近 5KB
+    const trimAmount = full.length > SCAN_WINDOW ? full.length - SCAN_WINDOW : 0;
     const text = trimAmount > 0 ? full.slice(trimAmount) : full;
 
     const getTimestamp = (posInTrimmed: number): Date | null => {
