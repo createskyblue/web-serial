@@ -4,6 +4,8 @@
 
 A browser-based, install-free, minimal communication debug platform. Serial, Bluetooth, and WebSocket in one tool — real-time send/receive + keyword highlighting + data extraction.
 
+GitHub: https://github.com/createskyblue/web-serial-monitor
+
 ![Screenshot](img/PixPin_2026-08-03_12-18-10.jpg)
 
 | Quick Send | Highlight & Extract |
