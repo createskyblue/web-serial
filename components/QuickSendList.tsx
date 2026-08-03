@@ -1,6 +1,7 @@
 
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { QuickSendItem, DisplayMode } from '../types';
+import { stringToUint8Array, uint8ArrayToHex, hexToUint8Array, uint8ArrayToString } from '../utils/converters';
 
 interface QuickSendListProps {
   items: QuickSendItem[];
@@ -33,6 +34,81 @@ const QuickSendList: React.FC<QuickSendListProps> = ({ items, onSend, onUpdate, 
   const updateItem = (id: string, updates: Partial<QuickSendItem>) => {
     onUpdate(items.map(item => item.id === id ? { ...item, ...updates } : item));
   };
+
+  // 切换 Text/HEX 模式时自动转换内容（HEX 用空格分隔）
+  const changeMode = (id: string, newMode: DisplayMode) => {
+    const item = items.find(i => i.id === id);
+    if (!item || item.mode === newMode) return;
+    let content = item.content;
+    try {
+      if (item.mode === DisplayMode.Text && newMode === DisplayMode.Hex) {
+        content = uint8ArrayToHex(stringToUint8Array(item.content));
+      } else if (item.mode === DisplayMode.Hex && newMode === DisplayMode.Text) {
+        content = uint8ArrayToString(hexToUint8Array(item.content));
+      }
+    } catch {
+      // 非法 HEX 等转换失败时保留原内容，仅切换模式
+    }
+    updateItem(id, { mode: newMode, content });
+  };
+
+  // 拖拽排序（调整显示/发送顺序）
+  const listRef = useRef<HTMLDivElement>(null);
+  const dragIndexRef = useRef<number | null>(null);
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+  // 用 ref 保存最新值，避免 mousemove 监听器重复注册
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  const onUpdateRef = useRef(onUpdate);
+  onUpdateRef.current = onUpdate;
+
+  const onHandleMouseDown = (e: React.MouseEvent, index: number) => {
+    e.preventDefault(); // 防止拖拽时选中文本
+    dragIndexRef.current = index;
+    setDraggingIndex(index);
+    document.body.style.userSelect = 'none';
+  };
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      const from = dragIndexRef.current;
+      if (from === null) return;
+      const list = listRef.current;
+      if (!list) return;
+      const items = Array.from(list.querySelectorAll('[data-item-id]')) as HTMLElement[];
+      let to = from;
+      for (let i = 0; i < items.length; i++) {
+        const rect = items[i].getBoundingClientRect();
+        if (e.clientY < rect.top + rect.height / 2) {
+          to = i;
+          break;
+        }
+        to = i + 1;
+      }
+      to = Math.max(0, Math.min(to, itemsRef.current.length - 1));
+      if (to !== from) {
+        const next = [...itemsRef.current];
+        const [moved] = next.splice(from, 1);
+        next.splice(to, 0, moved);
+        onUpdateRef.current(next);
+        dragIndexRef.current = to;
+        setDraggingIndex(to); // 高亮跟随拖动的卡片
+      }
+    };
+    const onMouseUp = () => {
+      if (dragIndexRef.current !== null) {
+        dragIndexRef.current = null;
+        setDraggingIndex(null);
+        document.body.style.userSelect = '';
+      }
+    };
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
 
   const exportData = () => {
     const dataStr = JSON.stringify(items, null, 2);
@@ -105,21 +181,30 @@ const QuickSendList: React.FC<QuickSendListProps> = ({ items, onSend, onUpdate, 
       </div>
       )}
 
-      <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
+      <div ref={listRef} className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
         {items.length === 0 && (
           <div className="text-center py-10 text-gray-400 text-xs">
             暂无快捷指令
           </div>
         )}
-        {items.map((item) => (
-          <div key={item.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-200 transition-colors group">
+        {items.map((item, index) => (
+          <div key={item.id} data-item-id={item.id} className={`p-3 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-200 transition-colors group ${draggingIndex === index ? 'opacity-50' : ''}`}>
             <div className="flex items-center justify-between mb-2">
-              <input
-                value={item.label}
-                onChange={(e) => updateItem(item.id, { label: e.target.value })}
-                className="bg-transparent text-[11px] font-bold text-gray-600 focus:outline-none focus:text-blue-600 w-2/3"
-                placeholder="指令名称"
-              />
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span
+                  onMouseDown={(e) => onHandleMouseDown(e, index)}
+                  title="拖拽调整顺序"
+                  className="cursor-grab text-gray-400 hover:text-blue-500 select-none active:cursor-grabbing shrink-0"
+                >
+                  <i className="fas fa-grip-vertical text-[10px]"></i>
+                </span>
+                <input
+                  value={item.label}
+                  onChange={(e) => updateItem(item.id, { label: e.target.value })}
+                  className="bg-transparent text-[11px] font-bold text-gray-600 focus:outline-none focus:text-blue-600 w-2/3"
+                  placeholder="指令名称"
+                />
+              </div>
               <button onClick={() => removeItem(item.id)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
                 <i className="fas fa-times-circle text-xs"></i>
               </button>
@@ -135,11 +220,11 @@ const QuickSendList: React.FC<QuickSendListProps> = ({ items, onSend, onUpdate, 
             <div className="flex items-center justify-between">
               <div className="flex bg-gray-200 p-0.5 rounded">
                 <button
-                  onClick={() => updateItem(item.id, { mode: DisplayMode.Text })}
+                  onClick={() => changeMode(item.id, DisplayMode.Text)}
                   className={`px-2 py-0.5 text-[9px] rounded ${item.mode === DisplayMode.Text ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}
-                >文本模式</button>
+                >Text</button>
                 <button
-                  onClick={() => updateItem(item.id, { mode: DisplayMode.Hex })}
+                  onClick={() => changeMode(item.id, DisplayMode.Hex)}
                   className={`px-2 py-0.5 text-[9px] rounded ${item.mode === DisplayMode.Hex ? 'bg-white shadow-sm text-blue-600 font-bold' : 'text-gray-500'}`}
                 >HEX</button>
               </div>

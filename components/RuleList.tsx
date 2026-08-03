@@ -1,6 +1,6 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { Rule, DisplayMode, LogEntry } from '../types';
-import { hexToUint8Array, uint8ArrayToString, uint8ArrayToHex } from '../utils/converters';
+import { hexToUint8Array, uint8ArrayToString, uint8ArrayToHex, stringToUint8Array } from '../utils/converters';
 
 interface RuleListProps {
   rules: Rule[];
@@ -155,6 +155,64 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs, onRefreshAll
     return results;
   }, [rules, scanData]);
 
+  // 拖拽排序（调整优先级：越靠下优先级越高，后定义的规则覆盖前面的）
+  const listRef = useRef<HTMLDivElement>(null);
+  const dragIndexRef = useRef<number | null>(null);
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+  // 用 ref 保存最新值，避免 mousemove 监听器重复注册
+  const rulesRef = useRef(rules);
+  rulesRef.current = rules;
+  const onUpdateRef = useRef(onUpdate);
+  onUpdateRef.current = onUpdate;
+
+  const onHandleMouseDown = (e: React.MouseEvent, index: number) => {
+    e.preventDefault(); // 防止拖拽时选中文本
+    dragIndexRef.current = index;
+    setDraggingIndex(index);
+    document.body.style.userSelect = 'none';
+  };
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      const from = dragIndexRef.current;
+      if (from === null) return;
+      const list = listRef.current;
+      if (!list) return;
+      const items = Array.from(list.querySelectorAll('[data-rule-id]')) as HTMLElement[];
+      let to = from;
+      for (let i = 0; i < items.length; i++) {
+        const rect = items[i].getBoundingClientRect();
+        if (e.clientY < rect.top + rect.height / 2) {
+          to = i;
+          break;
+        }
+        to = i + 1;
+      }
+      to = Math.max(0, Math.min(to, rulesRef.current.length - 1));
+      if (to !== from) {
+        const next = [...rulesRef.current];
+        const [moved] = next.splice(from, 1);
+        next.splice(to, 0, moved);
+        onUpdateRef.current(next);
+        dragIndexRef.current = to;
+        setDraggingIndex(to); // 高亮跟随拖动的卡片
+      }
+    };
+    const onMouseUp = () => {
+      if (dragIndexRef.current !== null) {
+        dragIndexRef.current = null;
+        setDraggingIndex(null);
+        document.body.style.userSelect = '';
+      }
+    };
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
+
   const addRule = () => {
     const newRule: Rule = {
       id: Math.random().toString(36).substr(2, 9),
@@ -174,6 +232,27 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs, onRefreshAll
 
   const updateRule = (id: string, updates: Partial<Rule>) => {
     onUpdate(rules.map(r => r.id === id ? { ...r, ...updates } : r));
+  };
+
+  // 切换起始/结束字段的 T/H 模式时自动转换内容（HEX 用空格分隔）
+  const changeKeyMode = (
+    rule: Rule,
+    modeField: 'leftKeyMode' | 'rightKeyMode',
+    field: 'leftKey' | 'rightKey',
+    newMode: DisplayMode
+  ) => {
+    if (rule[modeField] === newMode) return;
+    let key = rule[field];
+    try {
+      if (rule[modeField] === DisplayMode.Text && newMode === DisplayMode.Hex) {
+        key = uint8ArrayToHex(stringToUint8Array(rule[field]));
+      } else if (rule[modeField] === DisplayMode.Hex && newMode === DisplayMode.Text) {
+        key = uint8ArrayToString(hexToUint8Array(rule[field]));
+      }
+    } catch {
+      // 非法 HEX 等转换失败时保留原内容，仅切换模式
+    }
+    updateRule(rule.id, { [modeField]: newMode, [field]: key } as Partial<Rule>);
   };
 
   const ModeToggle = ({ mode, onChange }: { mode: DisplayMode; onChange: (m: DisplayMode) => void }) => (
@@ -197,7 +276,7 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs, onRefreshAll
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
+      <div ref={listRef} className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
         {rules.length === 0 && (
           <div className="text-center text-gray-400 text-xs py-8">
             <i className="fas fa-palette text-2xl opacity-20 mb-2 block"></i>
@@ -205,7 +284,7 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs, onRefreshAll
           </div>
         )}
 
-        {rules.map((rule) => {
+        {rules.map((rule, index) => {
           const result = extractedResults.find(r => r.ruleId === rule.id);
           const match = result?.match ?? null;
           const displayText = formatDisplayText(match?.text ?? null, rule.displayMode);
@@ -213,9 +292,20 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs, onRefreshAll
           const isKeywordMode = !!rule.leftKey && !rule.rightKey;
 
           return (
-            <div key={rule.id} className="p-2 bg-gray-50 rounded-lg border border-gray-200 space-y-1.5">
-              {/* 行1: 颜色 + 起始 + 结束 + 删除 */}
+            <div
+              key={rule.id}
+              data-rule-id={rule.id}
+              className={`p-2 bg-gray-50 rounded-lg border border-gray-200 space-y-1.5 transition-opacity ${draggingIndex === index ? 'opacity-50' : ''}`}
+            >
+              {/* 行1: 拖拽手柄 + 颜色 + 起始 + 结束 + 删除 */}
               <div className="flex items-center gap-1.5">
+                <span
+                  onMouseDown={(e) => onHandleMouseDown(e, index)}
+                  title="拖拽调整优先级（越靠下优先级越高）"
+                  className="cursor-grab text-gray-400 hover:text-blue-500 select-none active:cursor-grabbing"
+                >
+                  <i className="fas fa-grip-vertical text-[10px]"></i>
+                </span>
                 <input
                   type="color"
                   value={rule.color}
@@ -248,8 +338,8 @@ const RuleList: React.FC<RuleListProps> = ({ rules, onUpdate, logs, onRefreshAll
               {/* 行2: mode toggles + 模式标签 + 显示模式 */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <ModeToggle mode={rule.leftKeyMode} onChange={(m) => updateRule(rule.id, { leftKeyMode: m })} />
-                  {!isKeywordMode && <ModeToggle mode={rule.rightKeyMode} onChange={(m) => updateRule(rule.id, { rightKeyMode: m })} />}
+                  <ModeToggle mode={rule.leftKeyMode} onChange={(m) => changeKeyMode(rule, 'leftKeyMode', 'leftKey', m)} />
+                  {!isKeywordMode && <ModeToggle mode={rule.rightKeyMode} onChange={(m) => changeKeyMode(rule, 'rightKeyMode', 'rightKey', m)} />}
                   <span className={`text-[9px] font-bold ${isKeywordMode ? 'text-amber-600' : 'text-gray-400'}`}>
                     {isKeywordMode ? '关键词' : '区间'}
                   </span>
