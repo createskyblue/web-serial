@@ -30,6 +30,7 @@ A browser-based, install-free, minimal communication debug platform. Serial, Blu
 - **Tri-fold layout**: collapse left/right sidebars & send area — the whole app can shrink to a tiny window that barely takes any space
 - **Flow control**: DTR / RTS manual control, pre-settable before connecting
 - **Smart auto-scroll**: follows only when you're at the bottom — scrolling up won't yank you
+- **Huge-data optimization**: history is stored in chunks; only the recent window is rendered by default, scrolling up loads older history on demand and returning to the bottom unloads it — memory and DOM stay bounded however much data streams in
 - **Send**: timed send, file send (RAW / YModem), quick-send list
 - **Manage**: buffer protection, export TXT/BIN, one-click copy, config import/export, clear
 
