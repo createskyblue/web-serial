@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Windows 保留设备名文件（Git 无法索引 nul）
+nul
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
