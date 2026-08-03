@@ -24,6 +24,7 @@ A browser-based, install-free, minimal communication debug platform. Serial, Blu
 
 ### Pro Debugging Details
 - **Display**: Text / HEX / Split (Text|HEX side-by-side), `Tab` to switch
+- **Tri-fold layout**: collapse left/right sidebars & send area — the whole app can shrink to a tiny window that barely takes any space
 - **Flow control**: DTR / RTS manual control, pre-settable before connecting
 - **Smart auto-scroll**: follows only when you're at the bottom — scrolling up won't yank you
 - **Send**: timed send, file send (RAW / YModem), quick-send list
