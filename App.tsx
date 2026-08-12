@@ -212,6 +212,11 @@ const App: React.FC = () => {
   const sendQueueRef = useRef<{data: Uint8Array, text: string, mode: DisplayMode}[]>([]); // 发送队列
   const isSendingRef = useRef(false); // 是否正在发送
   const isDisconnectingRef = useRef(false); // 是否正在断开中（防止重复触发）
+  const fileSendAbortRef = useRef<AbortController | null>(null); // 文件发送取消控制器
+  const lastAppliedConfigRef = useRef<SerialConfig | null>(null); // 上次成功应用到串口的参数（重连应用失败时回滚）
+  const isApplyingParamsRef = useRef(false); // 串口参数自动重连是否进行中
+  const pendingApplyConfigRef = useRef<SerialConfig | null>(null); // 待应用的参数（重连中/发送文件中暂存，结束后补应用）
+  const applySerialParamsRef = useRef<(config: SerialConfig) => Promise<void>>(async () => {}); // 始终指向最新的 applySerialParams
 
   // 用于统计每秒\n的计数器
   const newlineCountRef = useRef(0);
@@ -657,6 +662,16 @@ const App: React.FC = () => {
     }
   };
 
+  // 监听串口断开事件（硬件拔除），并存储清理函数用于断开时移除监听
+  const attachDisconnectHandler = (targetPort: SerialPort) => {
+    const onDisconnect = () => {
+      addLog('info', new Uint8Array(), '串口硬件已断开');
+      handleSerialDisconnect();
+    };
+    (targetPort as any).addEventListener('disconnect', onDisconnect);
+    (targetPort as any)._disconnectHandler = onDisconnect;
+  };
+
   // 打开串口的辅助函数
   const openSerialPort = async (targetPort: SerialPort) => {
     try {
@@ -669,6 +684,7 @@ const App: React.FC = () => {
       setPort(targetPort);
       setIsConnected(true);
       keepReadingRef.current = true;
+      lastAppliedConfigRef.current = config; // 记录本次连接实际应用的参数
 
       // 应用预设的流控信号（连接瞬间的初始 DTR/RTS 状态）
       try {
@@ -685,15 +701,7 @@ const App: React.FC = () => {
         // 部分设备/驱动不支持回读，忽略并保持当前值
       }
 
-      // 监听串口断开事件（硬件拔除）
-      const onDisconnect = () => {
-        addLog('info', new Uint8Array(), '串口硬件已断开');
-        handleSerialDisconnect();
-      };
-      (targetPort as any).addEventListener('disconnect', onDisconnect);
-
-      // 存储清理函数，用于断开时移除监听
-      (targetPort as any)._disconnectHandler = onDisconnect;
+      attachDisconnectHandler(targetPort);
 
       addLog('info', new Uint8Array(), `已连接: ${config.baudRate} bps`);
       readLoop(targetPort);
@@ -725,6 +733,137 @@ const App: React.FC = () => {
       addLog('error', new Uint8Array(), `设置 RTS 失败: ${err.message}`);
     }
   };
+
+  // 取消正在进行的文件发送（中断后由 handleFileSend 内循环检测并退出）
+  const cancelFileSend = useCallback(() => {
+    fileSendAbortRef.current?.abort();
+  }, []);
+
+  // 动态修改波特率等参数。说明：Web Serial API 规范中没有 reconfigure() 方法，
+  // 端口打开后无法直接改参（再次 open() 会抛 InvalidStateError），标准做法是关闭后用
+  // 新参数重新 open()。这里自动完成「停止读取 → 关闭 → 重开 → 恢复读取」，用户无需手动断开重连。
+  const applySerialParams = async (newConfig: SerialConfig) => {
+    if (!port || !isConnected) return;
+
+    // 若目标配置已是实际应用的值，跳过（防重复重连）
+    const applied = lastAppliedConfigRef.current;
+    if (applied &&
+        applied.baudRate === newConfig.baudRate &&
+        applied.dataBits === newConfig.dataBits &&
+        applied.stopBits === newConfig.stopBits &&
+        applied.parity === newConfig.parity) {
+      return;
+    }
+
+    // 正在发送文件：暂存待办，发送结束后自动补应用，避免关闭端口导致写入中断
+    if (fileSendAbortRef.current) {
+      pendingApplyConfigRef.current = newConfig;
+      addLog('info', new Uint8Array(), '文件发送中，串口参数将在发送结束后自动应用');
+      return;
+    }
+
+    // 已有重连进行中：暂存最新配置，结束后自动补应用
+    if (isApplyingParamsRef.current) {
+      pendingApplyConfigRef.current = newConfig;
+      return;
+    }
+
+    isApplyingParamsRef.current = true;
+    try {
+      addLog('info', new Uint8Array(), `正在应用串口参数: ${newConfig.baudRate} bps ...`);
+
+      // 1. 停止读取循环
+      keepReadingRef.current = false;
+      if (readerRef.current) {
+        try {
+          await Promise.race([
+            readerRef.current.cancel(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('cancel timeout')), 1000))
+          ]);
+        } catch { /* 忽略取消超时 */ }
+        readerRef.current = null;
+      }
+
+      // 2. 移除断开监听并关闭端口
+      const disconnectHandler = (port as any)._disconnectHandler;
+      if (disconnectHandler) {
+        try { (port as any).removeEventListener('disconnect', disconnectHandler); } catch { /* 忽略 */ }
+      }
+      try {
+        await Promise.race([
+          port.close(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('close timeout')), 1000))
+        ]);
+      } catch { /* 忽略关闭超时 */ }
+
+      // 3. 用新参数重新打开
+      await port.open({
+        baudRate: newConfig.baudRate,
+        dataBits: newConfig.dataBits,
+        stopBits: newConfig.stopBits,
+        parity: newConfig.parity
+      });
+
+      // 4. 恢复流控信号、断开监听与读取循环
+      try {
+        await port.setSignals({ dataTerminalReady: newConfig.dtr, requestToSend: newConfig.rts });
+      } catch { /* 忽略：部分芯片/驱动不支持 */ }
+      attachDisconnectHandler(port);
+
+      // 仅更新串口参数相关字段，保留用户可能改过的 dtr/rts
+      setConfig(prev => ({
+        ...prev,
+        baudRate: newConfig.baudRate,
+        dataBits: newConfig.dataBits,
+        stopBits: newConfig.stopBits,
+        parity: newConfig.parity
+      }));
+      lastAppliedConfigRef.current = newConfig;
+      keepReadingRef.current = true;
+      readLoop(port);
+
+      const parityText = newConfig.parity === 'none' ? '无' : newConfig.parity === 'even' ? '偶' : newConfig.parity === 'odd' ? '奇' : newConfig.parity;
+      addLog('info', new Uint8Array(), `串口参数已更新: ${newConfig.baudRate} bps / ${newConfig.dataBits}位 / ${newConfig.stopBits}停止位 / 校验${parityText}`);
+    } catch (err: any) {
+      // 重开失败：回滚配置并标记断开，同时清空待办（端口已不可用）
+      pendingApplyConfigRef.current = null;
+      if (lastAppliedConfigRef.current) setConfig(lastAppliedConfigRef.current);
+      setPort(null);
+      setIsConnected(false);
+      keepReadingRef.current = false;
+      addLog('error', new Uint8Array(), `串口参数应用失败: ${err.message}，串口已断开`);
+    } finally {
+      isApplyingParamsRef.current = false;
+      // 重连期间又有新变更 → 补应用（用 ref 取最新函数，避免陈旧闭包）
+      const pending = pendingApplyConfigRef.current;
+      pendingApplyConfigRef.current = null;
+      if (pending && port && isConnected) {
+        applySerialParamsRef.current(pending);
+      }
+    }
+  };
+
+  // 让 ref 始终指向最新的 applySerialParams（防抖/补应用调用时避免陈旧闭包）
+  useEffect(() => {
+    applySerialParamsRef.current = applySerialParams;
+  });
+
+  // 连接状态下：波特率/数据位/停止位/校验位变化后，防抖自动重连生效（无需按钮）
+  useEffect(() => {
+    if (!isConnected || !port) return;
+    const applied = lastAppliedConfigRef.current;
+    if (applied &&
+        applied.baudRate === config.baudRate &&
+        applied.dataBits === config.dataBits &&
+        applied.stopBits === config.stopBits &&
+        applied.parity === config.parity) {
+      return; // 与已应用的一致，无需重连
+    }
+    const timer = setTimeout(() => {
+      applySerialParamsRef.current(config);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [config.baudRate, config.dataBits, config.stopBits, config.parity, isConnected, port]);
 
   // 处理串口断开（硬件拔除或软件关闭）
   const handleSerialDisconnect = async () => {
@@ -898,14 +1037,18 @@ const App: React.FC = () => {
       return;
     }
 
-    if (commMode === CommMode.Bluetooth) {
-      // 蓝牙模式发送文件
-      if (!bluetoothTxCharacteristicRef.current) {
-        addLog('error', new Uint8Array(), '文件发送失败: 蓝牙未连接');
-        return;
-      }
+    // 创建取消控制器，供 Sender 组件点击「取消」时中断发送
+    const controller = new AbortController();
+    fileSendAbortRef.current = controller;
 
-      try {
+    try {
+      if (commMode === CommMode.Bluetooth) {
+        // 蓝牙模式发送文件
+        if (!bluetoothTxCharacteristicRef.current) {
+          addLog('error', new Uint8Array(), '文件发送失败: 蓝牙未连接');
+          return;
+        }
+
         const arrayBuffer = await file.arrayBuffer();
         const data = new Uint8Array(arrayBuffer);
         const total = data.length;
@@ -915,9 +1058,16 @@ const App: React.FC = () => {
         addLog('info', new Uint8Array(), `开始发送文件: ${file.name} (${total} 字节)`);
 
         let sent = 0;
+        let cancelled = false;
         while (sent < total) {
           if (isPaused) {
             addLog('error', new Uint8Array(), '文件发送中断: 已暂停');
+            cancelled = true;
+            break;
+          }
+          if (controller.signal.aborted) {
+            addLog('info', new Uint8Array(), '文件发送已取消');
+            cancelled = true;
             break;
           }
 
@@ -933,92 +1083,111 @@ const App: React.FC = () => {
           }
         }
 
-        if (!isPaused) {
+        if (!cancelled) {
           addLog('info', new Uint8Array(), '文件发送完毕');
         }
-      } catch (err: any) {
-        addLog('error', new Uint8Array(), `文件发送中断: ${err.message}`);
-      }
-    } else if (commMode === CommMode.WebSocket) {
-      // WebSocket 模式发送文件
-      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-        addLog('error', new Uint8Array(), '文件发送失败: WebSocket 未连接');
-        return;
-      }
-      
-      try {
+      } else if (commMode === CommMode.WebSocket) {
+        // WebSocket 模式发送文件
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+          addLog('error', new Uint8Array(), '文件发送失败: WebSocket 未连接');
+          return;
+        }
+
         const arrayBuffer = await file.arrayBuffer();
         const data = new Uint8Array(arrayBuffer);
         const total = data.length;
-        
+
         // 添加文件发送的TX日志，用于计数
         addLog('tx', data, `文件: ${file.name} (${total} 字节)`);
         addLog('info', new Uint8Array(), `开始发送文件: ${file.name} (${total} 字节)`);
-        
+
         let sent = 0;
+        let cancelled = false;
         while (sent < total) {
           // 检查是否在发送过程中被暂停
           if (isPaused) {
             addLog('error', new Uint8Array(), '文件发送中断: 已暂停');
+            cancelled = true;
             break;
           }
-          
+          // 检查是否被取消
+          if (controller.signal.aborted) {
+            addLog('info', new Uint8Array(), '文件发送已取消');
+            cancelled = true;
+            break;
+          }
+
           const chunk = data.slice(sent, sent + options.throttleBytes);
           wsRef.current.send(chunk);
           sent += chunk.length;
           options.onProgress(Math.round((sent / total) * 100));
-          
+
           if (options.throttleMs > 0 && sent < total) {
             await new Promise(resolve => setTimeout(resolve, options.throttleMs));
           }
         }
-        
-        if (!isPaused) {
+
+        if (!cancelled) {
           addLog('info', new Uint8Array(), '文件发送完毕');
         }
-      } catch (err: any) {
-        addLog('error', new Uint8Array(), `文件发送中断: ${err.message}`);
+      } else {
+        // 串口模式发送文件
+        if (!port || !port.writable) return;
+
+        const writer = port.writable.getWriter();
+        const arrayBuffer = await file.arrayBuffer();
+        const data = new Uint8Array(arrayBuffer);
+        const total = data.length;
+
+        // 添加文件发送的TX日志，用于计数
+        addLog('tx', data, `文件: ${file.name} (${total} 字节)`);
+
+        try {
+          addLog('info', new Uint8Array(), `开始发送文件: ${file.name} (${total} 字节)`);
+
+          let sent = 0;
+          let cancelled = false;
+          while (sent < total) {
+            // 检查是否在发送过程中被暂停
+            if (isPaused) {
+              addLog('error', new Uint8Array(), '文件发送中断: 已暂停');
+              cancelled = true;
+              break;
+            }
+            // 检查是否被取消
+            if (controller.signal.aborted) {
+              addLog('info', new Uint8Array(), '文件发送已取消');
+              cancelled = true;
+              break;
+            }
+
+            const chunk = data.slice(sent, sent + options.throttleBytes);
+            await writer.write(chunk);
+            sent += chunk.length;
+            options.onProgress(Math.round((sent / total) * 100));
+
+            if (options.throttleMs > 0 && sent < total) {
+              await new Promise(resolve => setTimeout(resolve, options.throttleMs));
+            }
+          }
+
+          if (!cancelled) {
+            addLog('info', new Uint8Array(), '文件发送完毕');
+          }
+        } catch (err: any) {
+          addLog('error', new Uint8Array(), `文件发送中断: ${err.message}`);
+        } finally {
+          writer.releaseLock();
+        }
       }
-    } else {
-      // 串口模式发送文件
-      if (!port || !port.writable) return;
-      
-      const writer = port.writable.getWriter();
-      const arrayBuffer = await file.arrayBuffer();
-      const data = new Uint8Array(arrayBuffer);
-      const total = data.length;
-      
-      // 添加文件发送的TX日志，用于计数
-      addLog('tx', data, `文件: ${file.name} (${total} 字节)`);
-      
-      try {
-        addLog('info', new Uint8Array(), `开始发送文件: ${file.name} (${total} 字节)`);
-        
-        let sent = 0;
-        while (sent < total) {
-          // 检查是否在发送过程中被暂停
-          if (isPaused) {
-            addLog('error', new Uint8Array(), '文件发送中断: 已暂停');
-            break;
-          }
-          
-          const chunk = data.slice(sent, sent + options.throttleBytes);
-          await writer.write(chunk);
-          sent += chunk.length;
-          options.onProgress(Math.round((sent / total) * 100));
-          
-          if (options.throttleMs > 0 && sent < total) {
-            await new Promise(resolve => setTimeout(resolve, options.throttleMs));
-          }
-        }
-        
-        if (!isPaused) {
-          addLog('info', new Uint8Array(), '文件发送完毕');
-        }
-      } catch (err: any) {
-        addLog('error', new Uint8Array(), `文件发送中断: ${err.message}`);
-      } finally {
-        writer.releaseLock();
+    } finally {
+      // 发送结束（完成/取消/出错）后清理取消控制器
+      if (fileSendAbortRef.current === controller) fileSendAbortRef.current = null;
+      // 若发送期间用户修改过串口参数，发送结束后自动补应用
+      const pending = pendingApplyConfigRef.current;
+      if (pending && port && isConnected) {
+        pendingApplyConfigRef.current = null;
+        applySerialParamsRef.current(pending);
       }
     }
   };
@@ -1375,7 +1544,7 @@ const App: React.FC = () => {
         
 
         <div className={`bg-white shadow-sm m-2 mb-2 select-none ${isDragging ? '' : 'transition-all duration-200'}`} style={isSenderCollapsed ? { height: '36px' } : { height: `${100 - splitPosition}%`, minHeight: '80px' }}>
-          <Sender onSend={sendData} onFileSend={handleFileSend} isConnected={isConnected && !isPaused} isReconnecting={isReconnecting} isCollapsed={isSenderCollapsed} onToggleCollapse={() => setIsSenderCollapsed(prev => !prev)} />
+          <Sender onSend={sendData} onFileSend={handleFileSend} onCancelFileSend={cancelFileSend} isConnected={isConnected && !isPaused} isReconnecting={isReconnecting} isCollapsed={isSenderCollapsed} onToggleCollapse={() => setIsSenderCollapsed(prev => !prev)} />
         </div>
       </main>
 

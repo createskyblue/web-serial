@@ -336,8 +336,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   name="baudRate"
                   value={isCustomBaudRate ? 'custom' : config.baudRate}
                   onChange={handleChange}
-                  disabled={isConnected}
-                  className="w-full bg-gray-50 border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 outline-none"
+                  className="w-full bg-gray-50 border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                 >
                   {baudRates.map(br => <option key={br} value={br}>{br}</option>)}
                   <option value="custom">自定义</option>
@@ -347,9 +346,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                     type="text"
                     value={customBaudRate}
                     onChange={handleCustomBaudRateChange}
-                    disabled={isConnected}
                     placeholder="输入波特率"
-                    className="w-full mt-2 bg-gray-50 border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 outline-none font-mono"
+                    className="w-full mt-2 bg-gray-50 border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-mono"
                   />
                 )}
               </div>
@@ -357,14 +355,14 @@ const Sidebar: React.FC<SidebarProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">数据位</label>
-                  <select name="dataBits" value={config.dataBits} onChange={handleChange} disabled={isConnected} className="w-full bg-gray-50 border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 outline-none">
+                  <select name="dataBits" value={config.dataBits} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
                     <option value={DataBits.Seven}>7</option>
                     <option value={DataBits.Eight}>8</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">停止位</label>
-                  <select name="stopBits" value={config.stopBits} onChange={handleChange} disabled={isConnected} className="w-full bg-gray-50 border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 outline-none">
+                  <select name="stopBits" value={config.stopBits} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
                     <option value={StopBits.One}>1</option>
                     <option value={StopBits.Two}>2</option>
                   </select>
@@ -373,12 +371,20 @@ const Sidebar: React.FC<SidebarProps> = ({
 
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1">校验位</label>
-                <select name="parity" value={config.parity} onChange={handleChange} disabled={isConnected} className="w-full bg-gray-50 border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 outline-none">
+                <select name="parity" value={config.parity} onChange={handleChange} className="w-full bg-gray-50 border border-gray-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
                   <option value={Parity.None}>None (无)</option>
                   <option value={Parity.Even}>Even (偶)</option>
                   <option value={Parity.Odd}>Odd (奇)</option>
                 </select>
               </div>
+
+              {/* 连接状态下：修改参数自动重连生效，无需手动断开 */}
+              {isConnected && (
+                <p className="text-[10px] text-gray-400 leading-tight">
+                  <i className="fas fa-sync-alt mr-1 text-xs"></i>
+                  修改参数后自动重连生效，无需断开
+                </p>
+              )}
 
               {/* 流控信号控制（DTR / RTS 两个按钮同行排列，未连接时也可预置） */}
               <div className="flex items-center justify-between pt-3">

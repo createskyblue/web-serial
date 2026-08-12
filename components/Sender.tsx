@@ -6,13 +6,14 @@ import { stringToUint8Array, uint8ArrayToString, hexToUint8Array, uint8ArrayToHe
 interface SenderProps {
   onSend: (data: string, mode: DisplayMode) => void;
   onFileSend: (file: File, options: { mode: FileSendMode, throttleBytes: number, throttleMs: number, onProgress: (p: number) => void }) => Promise<void>;
+  onCancelFileSend?: () => void;
   isConnected: boolean;
   isReconnecting?: boolean;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
 }
 
-const Sender: React.FC<SenderProps> = ({ onSend, onFileSend, isConnected, isReconnecting = false, isCollapsed = false, onToggleCollapse }) => {
+const Sender: React.FC<SenderProps> = ({ onSend, onFileSend, onCancelFileSend, isConnected, isReconnecting = false, isCollapsed = false, onToggleCollapse }) => {
   const [mode, setMode] = useState<DisplayMode>(DisplayMode.Text);
   const [input, setInput] = useState(() => {
     const saved = localStorage.getItem('serial-input');
@@ -296,7 +297,7 @@ const Sender: React.FC<SenderProps> = ({ onSend, onFileSend, isConnected, isReco
               </div>
             )}
 
-            {/* 两个按钮：选择文件和发送 */}
+            {/* 两个按钮：选择文件 和 发送/取消 */}
             <div className="flex gap-2">
               <button
                 onClick={() => fileInputRef.current?.click()}
@@ -308,21 +309,36 @@ const Sender: React.FC<SenderProps> = ({ onSend, onFileSend, isConnected, isReco
                 <i className="fas fa-folder-open mr-2"></i>
                 选择文件
               </button>
-              <button
-                onClick={handleFileSendClick}
-                disabled={(!isConnected && !isReconnecting) || isSendingFile || !selectedFile}
-                className={`flex-1 py-2 rounded-md text-[11px] font-bold transition-all shadow-sm flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed ${
-                  isSendingFile ? 'bg-amber-100 text-amber-700' : 'bg-blue-600 text-white hover:bg-blue-700'
-                }`}
-              >
-                <i className={`fas ${isSendingFile ? 'fa-sync fa-spin' : 'fa-paper-plane'} mr-2`}></i>
-                {isSendingFile ? `发送中 ${fileProgress}%` : '发送'}
-              </button>
+              {isSendingFile ? (
+                <button
+                  onClick={() => onCancelFileSend?.()}
+                  title="取消文件发送"
+                  className="flex-1 py-2 rounded-md text-[11px] font-bold transition-all shadow-sm flex items-center justify-center bg-red-500 text-white hover:bg-red-600"
+                >
+                  <i className="fas fa-stop mr-2"></i>
+                  取消
+                </button>
+              ) : (
+                <button
+                  onClick={handleFileSendClick}
+                  disabled={(!isConnected && !isReconnecting) || !selectedFile}
+                  className="flex-1 py-2 rounded-md text-[11px] font-bold transition-all shadow-sm flex items-center justify-center bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <i className="fas fa-paper-plane mr-2"></i>
+                  发送
+                </button>
+              )}
             </div>
 
             {isSendingFile && (
-              <div className="w-full bg-gray-200 rounded-full h-1 mt-2">
-                <div className="bg-amber-500 h-1 rounded-full transition-all" style={{ width: `${fileProgress}%` }}></div>
+              <div className="mt-2">
+                <div className="flex items-center justify-between text-[10px] text-gray-500 mb-1">
+                  <span>发送中...</span>
+                  <span>{fileProgress}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-1">
+                  <div className="bg-amber-500 h-1 rounded-full transition-all" style={{ width: `${fileProgress}%` }}></div>
+                </div>
               </div>
             )}
           </div>
