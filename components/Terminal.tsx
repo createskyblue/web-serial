@@ -287,7 +287,13 @@ const Terminal: React.FC<TerminalProps> = ({
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className={`flex-1 p-4 overflow-y-auto custom-scrollbar font-mono text-[13px] bg-slate-50/20 ${displayMode !== DisplayMode.SplitView ? 'whitespace-pre-wrap break-all' : ''}`}
+        className={`flex-1 p-4 overflow-y-auto custom-scrollbar font-mono text-[13px] bg-slate-50/20 ${
+          displayMode === DisplayMode.Hex
+            ? 'whitespace-pre-wrap break-all'      // HEX 保持现状：自动换行
+            : displayMode === DisplayMode.Text
+              ? 'overflow-x-auto whitespace-pre'   // 文本模式：不换行，超出显示横向滚动条（同窗模式文本列行为）
+              : ''
+        }`}
       >
         <div ref={sentinelRef} className="h-1 w-full" />
 
